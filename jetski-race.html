@@ -5,611 +5,398 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>🏁 Jetski Grand Prix</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: #0a3d6b;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100vw;
-    height: 100vh;
-    overflow: hidden;
-    touch-action: none;
-  }
-  #game-container {
-    width: 100%;
-    height: 100%;
-  }
-  canvas {
-    display: block;
-    width: 100% !important;
-    height: 100% !important;
-    image-rendering: pixelated;
-  }
-  /* D-pad controls */
-  #dpad {
-    position: fixed;
-    bottom: 32px;
-    left: 24px;
-    width: 150px;
-    height: 150px;
-    z-index: 100;
-    pointer-events: none;
-  }
-  .dpad-btn {
-    position: absolute;
-    width: 50px;
-    height: 50px;
-    background: rgba(255,255,255,0.18);
-    border: 2px solid rgba(255,255,255,0.4);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    color: white;
-    pointer-events: all;
-    cursor: pointer;
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: none;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .dpad-btn:active, .dpad-btn.active {
-    background: rgba(0,212,255,0.35);
-    border-color: #00d4ff;
-  }
-  #btn-up    { top: 0;    left: 50px; }
-  #btn-down  { top: 100px; left: 50px; }
-  #btn-left  { top: 50px; left: 0; }
-  #btn-right { top: 50px; left: 100px; }
-  #btn-boost {
-    position: fixed;
-    bottom: 48px;
-    right: 28px;
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: rgba(255,200,0,0.25);
-    border: 3px solid #ffd700;
-    color: #ffd700;
-    font-size: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    cursor: pointer;
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: none;
-    -webkit-tap-highlight-color: transparent;
-    font-weight: 900;
-    flex-direction: column;
-    gap: 2px;
-    pointer-events: all;
-  }
-  #btn-boost span.label {
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 1px;
-    color: #ffd700;
-  }
-  #btn-boost:active, #btn-boost.active {
-    background: rgba(255,200,0,0.5);
-  }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0a1628; overflow:hidden; touch-action:none; user-select:none; font-family:system-ui,sans-serif; }
+canvas { display:block; }
+#back-btn { position:fixed; top:12px; left:12px; z-index:9999; background:rgba(0,0,0,0.7); color:#00d4ff; border:2px solid #00d4ff; border-radius:50px; padding:8px 16px; font-size:16px; font-weight:800; cursor:pointer; text-decoration:none; }
+#dpad { position:fixed; bottom:20px; left:20px; z-index:100; display:grid; grid-template-columns:65px 65px 65px; grid-template-rows:65px 65px 65px; gap:4px; }
+.dpad-btn { background:rgba(255,255,255,0.15); border:2px solid rgba(255,255,255,0.4); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer; touch-action:none; -webkit-user-select:none; user-select:none; }
+.dpad-btn:active, .dpad-btn.pressed { background:rgba(255,255,255,0.4); }
+#boost-btn { position:fixed; bottom:30px; right:30px; z-index:100; width:85px; height:85px; border-radius:50%; background:radial-gradient(circle,#ffd700,#ff8c00); border:3px solid #fff; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900; color:#000; cursor:pointer; box-shadow:0 0 20px #ffd700; touch-action:none; }
 </style>
 </head>
 <body>
-<a href="index.html" style="position:fixed;top:12px;left:12px;z-index:9999;background:rgba(0,0,0,0.7);color:#00d4ff;border:2px solid #00d4ff;border-radius:50px;padding:8px 16px;font-size:16px;font-weight:800;text-decoration:none;">🏠 Arcade</a>
+<a id="back-btn" href="index.html">🏠 Arcade</a>
 
-<div id="game-container"></div>
-
-<!-- Mobile D-Pad -->
 <div id="dpad">
-  <div class="dpad-btn" id="btn-up">▲</div>
-  <div class="dpad-btn" id="btn-left">◀</div>
-  <div class="dpad-btn" id="btn-right">▶</div>
-  <div class="dpad-btn" id="btn-down">▼</div>
+  <div></div>
+  <div class="dpad-btn" id="btn-up">⬆️</div>
+  <div></div>
+  <div class="dpad-btn" id="btn-left">⬅️</div>
+  <div></div>
+  <div class="dpad-btn" id="btn-right">➡️</div>
+  <div></div>
+  <div class="dpad-btn" id="btn-down">⬇️</div>
+  <div></div>
 </div>
-<div id="btn-boost">⚡<span class="label">BOOST</span></div>
+
+<div id="boost-btn">⚡BOOST</div>
 
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 <script>
-// ─── TOUCH INPUT STATE ───────────────────────────────────────────────────────
-const touch = { up: false, down: false, left: false, right: false, boost: false };
+const W = window.innerWidth, H = window.innerHeight;
 
-function bindBtn(id, key) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.addEventListener('touchstart', e => { e.preventDefault(); touch[key] = true; el.classList.add('active'); }, { passive: false });
-  el.addEventListener('touchend',   e => { e.preventDefault(); touch[key] = false; el.classList.remove('active'); }, { passive: false });
-  el.addEventListener('mousedown',  e => { touch[key] = true;  el.classList.add('active'); });
-  el.addEventListener('mouseup',    e => { touch[key] = false; el.classList.remove('active'); });
-  el.addEventListener('mouseleave', e => { touch[key] = false; el.classList.remove('active'); });
-}
-bindBtn('btn-up',    'up');
-bindBtn('btn-down',  'down');
-bindBtn('btn-left',  'left');
-bindBtn('btn-right', 'right');
-
-const boostEl = document.getElementById('btn-boost');
-boostEl.addEventListener('touchstart', e => { e.preventDefault(); touch.boost = true;  boostEl.classList.add('active'); },   { passive: false });
-boostEl.addEventListener('touchend',   e => { e.preventDefault(); touch.boost = false; boostEl.classList.remove('active'); }, { passive: false });
-boostEl.addEventListener('mousedown',  e => { touch.boost = true;  boostEl.classList.add('active'); });
-boostEl.addEventListener('mouseup',    e => { touch.boost = false; boostEl.classList.remove('active'); });
-
-// ─── CONSTANTS ───────────────────────────────────────────────────────────────
-const W = 800, H = 600;
-const TOTAL_LAPS = 3;
-
-// Oval waypoints (center-line of track)
-function buildWaypoints() {
-  const cx = W / 2, cy = H / 2;
-  const rx = 290, ry = 200;
-  const pts = [];
-  const n = 24;
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2 - Math.PI / 2;
-    pts.push({ x: cx + Math.cos(a) * rx, y: cy + Math.sin(a) * ry });
-  }
-  return pts;
-}
-
-const WAYPOINTS = buildWaypoints();
-
-// AI names & colours
-const AI_RACERS = [
-  { name: 'RED ROCKET',   color: 0xff2222, offset: 20  },
-  { name: 'BLUE THUNDER', color: 0x2244ff, offset: -20 },
-  { name: 'GREEN FLASH',  color: 0x22cc44, offset: 40  },
+// Waypoints for S-curve track
+const WAYPOINTS = [
+  {x:W*0.5, y:H*0.15},
+  {x:W*0.8, y:H*0.2},
+  {x:W*0.85, y:H*0.4},
+  {x:W*0.7, y:H*0.55},
+  {x:W*0.5, y:H*0.5},
+  {x:W*0.3, y:H*0.45},
+  {x:W*0.15, y:H*0.6},
+  {x:W*0.2, y:H*0.8},
+  {x:W*0.5, y:H*0.85},
+  {x:W*0.8, y:H*0.8},
+  {x:W*0.85, y:H*0.6},
 ];
 
-// ─── MAIN SCENE ──────────────────────────────────────────────────────────────
 class RaceScene extends Phaser.Scene {
   constructor() { super('RaceScene'); }
 
-  preload() {}
-
   create() {
-    this.cameras.main.setBackgroundColor('#0a3d6b');
+    this.keys = this.input.keyboard.createCursorKeys();
+    this.wasd = this.input.keyboard.addKeys('W,A,S,D,SPACE');
+    this.boost = false;
+    this.boostTimer = 0;
+    this.countdown = 3;
+    this.countdownTimer = 0;
+    this.racing = false;
+    this.finished = false;
 
-    // ── Draw track ─────────────────────────────────────────────────────────
-    this.gfx = this.add.graphics();
+    // Draw background
+    const bg = this.add.graphics();
+    // Sky gradient
+    for(let y=0; y<H; y++) {
+      const t = y/H;
+      const r = Math.floor(Phaser.Math.Linear(45, 10, t));
+      const g = Math.floor(Phaser.Math.Linear(20, 22, t));
+      const b = Math.floor(Phaser.Math.Linear(105, 40, t));
+      bg.fillStyle(Phaser.Display.Color.GetColor(r,g,b));
+      bg.fillRect(0,y,W,1);
+    }
+
+    // Draw water (animated)
+    this.water = this.add.graphics();
+    this.waveOffset = 0;
+
+    // Draw track
+    this.trackGfx = this.add.graphics();
     this.drawTrack();
 
-    // ── Waypoints (invisible) ─────────────────────────────────────────────
-    this.waypoints = WAYPOINTS;
+    // Palm trees
+    this.drawPalms();
 
-    // ── Particles ─────────────────────────────────────────────────────────
-    this.particles = this.add.particles(0, 0, null, { quantity: 0 });
+    // Finish line
+    this.drawFinishLine();
 
-    // ── Create racers ─────────────────────────────────────────────────────
-    this.player = this.createRacer(0xffffff, 0x0099ff, 0, 'YOU', true);
-    this.aiRacers = AI_RACERS.map((cfg, i) =>
-      this.createRacer(cfg.color, 0xffffff, i + 1, cfg.name, false, cfg.offset)
-    );
-    this.allRacers = [this.player, ...this.aiRacers];
+    // Buoys
+    this.buoyGfx = this.add.graphics();
+    this.drawBuoys();
 
-    // ── HUD ───────────────────────────────────────────────────────────────
-    this.hudGfx = this.add.graphics();
-    this.posText   = this.add.text(W - 16, 16, '1ST', { fontFamily: 'Arial Black, Arial', fontSize: '28px', color: '#ffd700', stroke: '#000', strokeThickness: 4, align: 'right' }).setOrigin(1, 0).setDepth(10);
-    this.lapText   = this.add.text(W - 16, 54, 'LAP 1/3', { fontFamily: 'Arial Black, Arial', fontSize: '18px', color: '#ffffff', stroke: '#000', strokeThickness: 3, align: 'right' }).setOrigin(1, 0).setDepth(10);
-    this.speedText = this.add.text(16, 16, 'BOOST: READY', { fontFamily: 'Arial Black, Arial', fontSize: '14px', color: '#00ff88', stroke: '#000', strokeThickness: 3 }).setDepth(10);
-    this.nameLabels = this.allRacers.map(r =>
-      this.add.text(0, 0, r.isPlayer ? '▶YOU' : '', { fontFamily: 'Arial', fontSize: '11px', color: '#ffffff', stroke: '#000', strokeThickness: 2 }).setDepth(9)
-    );
+    // Create boats
+    this.player = this.createBoat(WAYPOINTS[0].x - 30, WAYPOINTS[0].y, 0xffffff, 0x0088ff);
+    this.ai1 = this.createBoat(WAYPOINTS[0].x - 10, WAYPOINTS[0].y + 20, 0xff2200, 0xff6600);
+    this.ai2 = this.createBoat(WAYPOINTS[0].x + 10, WAYPOINTS[0].y - 20, 0x0044ff, 0x00ccff);
+    this.ai3 = this.createBoat(WAYPOINTS[0].x + 30, WAYPOINTS[0].y + 40, 0x00cc00, 0x88ff00);
 
-    // ── Keyboard ──────────────────────────────────────────────────────────
-    this.keys = this.input.keyboard.addKeys({
-      up:    Phaser.Input.Keyboard.KeyCodes.UP,
-      down:  Phaser.Input.Keyboard.KeyCodes.DOWN,
-      left:  Phaser.Input.Keyboard.KeyCodes.LEFT,
-      right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
-      W:     Phaser.Input.Keyboard.KeyCodes.W,
-      A:     Phaser.Input.Keyboard.KeyCodes.A,
-      S:     Phaser.Input.Keyboard.KeyCodes.S,
-      D:     Phaser.Input.Keyboard.KeyCodes.D,
-      space: Phaser.Input.Keyboard.KeyCodes.SPACE,
+    this.aiBoats = [
+      {gfx: this.ai1, wp: 0, progress: 0, speed: 2.8, lap: 0, name: 'RED ROCKET', color: 0xff2200},
+      {gfx: this.ai2, wp: 0, progress: 0, speed: 3.0, lap: 0, name: 'BLUE THUNDER', color: 0x0044ff},
+      {gfx: this.ai3, wp: 0, progress: 0, speed: 2.6, lap: 0, name: 'GREEN FLASH', color: 0x00cc00},
+    ];
+
+    this.playerState = { wp: 0, progress: 0, lap: 0, angle: 0, speed: 0, vx: 0, vy: 0 };
+
+    // Wake particles
+    this.wakes = [];
+    this.boostParticles = [];
+
+    // HUD
+    this.posText = this.add.text(16, 16, '🥇 1st', {fontSize:'28px', fontStyle:'bold', color:'#ffd700', stroke:'#000', strokeThickness:4}).setDepth(10);
+    this.lapText = this.add.text(W-16, 16, 'LAP 1/3', {fontSize:'24px', fontStyle:'bold', color:'#fff', stroke:'#000', strokeThickness:3}).setDepth(10).setOrigin(1,0);
+    this.countdownText = this.add.text(W/2, H/2, '3', {fontSize:'120px', fontStyle:'bold', color:'#ff0', stroke:'#000', strokeThickness:8}).setDepth(10).setOrigin(0.5);
+    this.speedBar = this.add.graphics().setDepth(10);
+
+    // Input for boost
+    this.input.keyboard.on('keydown-SPACE', () => { this.activateBoost(); });
+    document.getElementById('boost-btn').addEventListener('touchstart', (e) => { e.preventDefault(); this.activateBoost(); });
+    document.getElementById('boost-btn').addEventListener('mousedown', () => { this.activateBoost(); });
+
+    // D-pad
+    ['up','down','left','right'].forEach(dir => {
+      const el = document.getElementById('btn-' + dir);
+      el.addEventListener('touchstart', e => { e.preventDefault(); this.dpad = this.dpad || {}; this.dpad[dir] = true; el.classList.add('pressed'); });
+      el.addEventListener('touchend', e => { e.preventDefault(); this.dpad[dir] = false; el.classList.remove('pressed'); });
+      el.addEventListener('mousedown', () => { this.dpad = this.dpad || {}; this.dpad[dir] = true; });
+      el.addEventListener('mouseup', () => { this.dpad[dir] = false; });
     });
-
-    // ── Wake trail graphics ────────────────────────────────────────────────
-    this.trailGfx = this.add.graphics().setDepth(3);
-    this.trails = this.allRacers.map(() => []);
-
-    // ── Particle emitters for boost ────────────────────────────────────────
-    this.boostEmitters = this.allRacers.map(r => {
-      const em = this.add.particles(r.x, r.y, null, {
-        speed: { min: 40, max: 100 },
-        angle: { min: 160, max: 200 },
-        scale: { start: 0.4, end: 0 },
-        alpha: { start: 0.8, end: 0 },
-        lifespan: 350,
-        quantity: 0,
-        tint: r.isPlayer ? 0x00d4ff : r.color,
-      });
-      em.setDepth(2);
-      return em;
-    });
-
-    // ── Race state ─────────────────────────────────────────────────────────
-    this.raceFinished = false;
-    this.winnerName = '';
-    this.countdown = 3;
-    this.countdownActive = true;
-    this.countdownText = this.add.text(W/2, H/2 - 40, '3', {
-      fontFamily: 'Arial Black, Arial',
-      fontSize: '120px',
-      color: '#ffd700',
-      stroke: '#000',
-      strokeThickness: 8,
-    }).setOrigin(0.5).setDepth(20);
-
-    this.time.addEvent({
-      delay: 1000,
-      repeat: 3,
-      callback: () => {
-        this.countdown--;
-        if (this.countdown > 0) {
-          this.countdownText.setText(String(this.countdown));
-        } else if (this.countdown === 0) {
-          this.countdownText.setText('GO!').setColor('#00ff88');
-        } else {
-          this.countdownText.destroy();
-          this.countdownActive = false;
-        }
-      }
-    });
-
-    // ── Camera subtle follow ───────────────────────────────────────────────
-    // No scroll; fixed view
+    this.dpad = {};
   }
 
-  // ─── Draw oval track ──────────────────────────────────────────────────────
+  createBoat(x, y, mainColor, accentColor) {
+    const g = this.add.graphics();
+    this.drawBoatShape(g, 0, 0, mainColor, accentColor);
+    g.x = x; g.y = y;
+    g._mc = mainColor; g._ac = accentColor;
+    return g;
+  }
+
+  drawBoatShape(g, x, y, mc, ac) {
+    g.clear();
+    // Main body
+    g.fillStyle(mc);
+    g.fillTriangle(x+25,y, x-20,y-12, x-20,y+12);
+    g.fillRect(x-20,y-10, 30, 20);
+    // Accent stripe
+    g.fillStyle(ac);
+    g.fillRect(x-15,y-4, 25, 8);
+    // Cockpit
+    g.fillStyle(0x333333);
+    g.fillEllipse(x+5, y, 14, 10);
+    // Shadow
+    g.fillStyle(0x000000, 0.2);
+    g.fillEllipse(x, y+14, 40, 8);
+  }
+
   drawTrack() {
-    const g = this.gfx;
-    const cx = W / 2, cy = H / 2;
-    const rx = 290, ry = 200;
-    const trackW = 80;
-
-    // Water background fill (already handled by camera bg)
-    g.fillStyle(0x0a3d6b, 1);
-    g.fillRect(0, 0, W, H);
-
-    // Outer track edge (white)
-    g.fillStyle(0xffffff, 1);
-    g.fillEllipse(cx, cy, (rx + trackW + 12) * 2, (ry + trackW + 12) * 2);
-
-    // Teal track surface
-    g.fillStyle(0x1a6b8a, 1);
-    g.fillEllipse(cx, cy, (rx + trackW) * 2, (ry + trackW) * 2);
-
-    // Inner edge (white)
-    g.fillStyle(0xffffff, 1);
-    g.fillEllipse(cx, cy, (rx - trackW + 4) * 2, (ry - trackW + 4) * 2);
-
-    // Inner water (hole)
-    g.fillStyle(0x0a3d6b, 1);
-    g.fillEllipse(cx, cy, (rx - trackW) * 2, (ry - trackW) * 2);
-
-    // Water outside track
-    g.fillStyle(0x0a3d6b, 1);
-    g.fillRect(0, 0, 16, H);
-    g.fillRect(W - 16, 0, 16, H);
-    g.fillRect(0, 0, W, 16);
-    g.fillRect(0, H - 16, W, 16);
-
-    // Yellow buoys at waypoints
-    for (let i = 0; i < WAYPOINTS.length; i += 3) {
-      const wp = WAYPOINTS[i];
-      // outer buoy
-      const angle = Math.atan2(wp.y - cy, wp.x - cx);
-      const outerX = cx + Math.cos(angle) * (rx + trackW - 10);
-      const outerY = cy + Math.sin(angle) * (ry + trackW - 10);
-      const innerX = cx + Math.cos(angle) * (rx - trackW + 10);
-      const innerY = cy + Math.sin(angle) * (ry - trackW + 10);
-      g.fillStyle(0xffdd00, 1);
-      g.fillCircle(outerX, outerY, 7);
-      g.fillStyle(0xff8800, 1);
-      g.fillCircle(innerX, innerY, 7);
+    const g = this.trackGfx;
+    g.clear();
+    // Draw track as thick path
+    g.lineStyle(80, 0x00aadd, 1);
+    g.beginPath();
+    g.moveTo(WAYPOINTS[0].x, WAYPOINTS[0].y);
+    for(let i=1; i<WAYPOINTS.length; i++) {
+      g.lineTo(WAYPOINTS[i].x, WAYPOINTS[i].y);
     }
-
-    // Start/finish line
-    g.fillStyle(0xffffff, 1);
-    const sfAngle = -Math.PI / 2;
-    const lx = cx + Math.cos(sfAngle) * rx;
-    const ly = cy + Math.sin(sfAngle) * ry;
-    g.fillRect(lx - 4, ly - trackW - 4, 8, trackW * 2 + 8);
-    g.fillStyle(0x000000, 1);
-    for (let i = 0; i < 8; i++) {
-      if (i % 2 === 0) g.fillRect(lx - 4, ly - trackW + i * (trackW / 4) - 4, 4, trackW / 4);
-      else              g.fillRect(lx,     ly - trackW + i * (trackW / 4) - 4, 4, trackW / 4);
+    g.lineTo(WAYPOINTS[0].x, WAYPOINTS[0].y);
+    g.strokePath();
+    // Track edges
+    g.lineStyle(4, 0xffffff, 0.6);
+    g.beginPath();
+    g.moveTo(WAYPOINTS[0].x, WAYPOINTS[0].y);
+    for(let i=1; i<WAYPOINTS.length; i++) {
+      g.lineTo(WAYPOINTS[i].x, WAYPOINTS[i].y);
     }
-
-    g.setDepth(0);
+    g.lineTo(WAYPOINTS[0].x, WAYPOINTS[0].y);
+    g.strokePath();
   }
 
-  // ─── Create racer object ──────────────────────────────────────────────────
-  createRacer(bodyColor, trimColor, waypointIndex, name, isPlayer, lateralOffset = 0) {
-    const startWP = WAYPOINTS[0];
-    const nextWP  = WAYPOINTS[1];
-    const angle   = Math.atan2(nextWP.y - startWP.y, nextWP.x - startWP.x);
-
-    // Stagger start positions around waypoint 0
-    const perpAngle = angle + Math.PI / 2;
-    const spread = [0, -30, 30, -60][waypointIndex] || 0;
-    const sx = startWP.x + Math.cos(perpAngle) * spread + lateralOffset;
-    const sy = startWP.y + Math.sin(perpAngle) * spread;
-
-    // Draw jetski as graphics texture
-    const key = 'racer_' + name.replace(/\s+/g, '_');
-    if (!this.textures.exists(key)) {
-      const rt = this.add.renderTexture(0, 0, 36, 22);
-      const g = this.make.graphics({ x: 0, y: 0, add: false });
-      // Hull
-      g.fillStyle(bodyColor, 1);
-      g.fillRect(2, 6, 28, 10);
-      // Nose
-      g.fillTriangle(30, 6, 36, 11, 30, 16);
-      // Trim
-      g.fillStyle(trimColor, 1);
-      g.fillRect(4, 8, 24, 6);
-      // Rider (dark blob)
-      g.fillStyle(0x222222, 1);
-      g.fillCircle(16, 11, 5);
-      rt.draw(g, 0, 0);
-      rt.saveTexture(key);
-      g.destroy();
-      rt.destroy();
-    }
-
-    const sprite = this.add.image(sx, sy, key).setDepth(5).setOrigin(0.5, 0.5);
-    sprite.rotation = angle;
-
-    return {
-      sprite,
-      x: sx, y: sy,
-      vx: 0, vy: 0,
-      angle,
-      speed: 0,
-      maxSpeed: isPlayer ? 260 : 210 + Math.random() * 40,
-      acceleration: isPlayer ? 180 : 140 + Math.random() * 30,
-      turnSpeed: 2.2,
-      wpIndex: 1,
-      lap: 1,
-      lapProgress: 0,  // waypoints cleared this lap
-      totalProgress: 0,
-      finished: false,
-      finishRank: 0,
-      isPlayer,
-      name,
-      color: bodyColor,
-      boostCooldown: 0,
-      boostActive: false,
-      boostTimer: 0,
-      aiAggression: 0.85 + Math.random() * 0.12,
-    };
-  }
-
-  // ─── UPDATE ───────────────────────────────────────────────────────────────
-  update(time, delta) {
-    const dt = delta / 1000;
-    if (this.raceFinished) return;
-    if (this.countdownActive) return;
-
-    this.trailGfx.clear();
-
-    this.allRacers.forEach((r, idx) => {
-      if (r.isPlayer) this.updatePlayer(r, dt);
-      else            this.updateAI(r, dt);
-
-      this.moveRacer(r, dt);
-      this.checkWaypoint(r);
-
-      // Sync sprite
-      r.sprite.x = r.x;
-      r.sprite.y = r.y;
-      r.sprite.rotation = r.angle;
-
-      // Boost particles
-      if (r.boostActive) {
-        const em = this.boostEmitters[idx];
-        em.setPosition(r.x, r.y);
-        em.setParticleAngle({ min: Phaser.Math.RadToDeg(r.angle) + 160, max: Phaser.Math.RadToDeg(r.angle) + 200 });
-        em.emitParticle(3);
-      }
-
-      // Wake trail
-      const trail = this.trails[idx];
-      trail.push({ x: r.x, y: r.y, a: 0.4 });
-      if (trail.length > 20) trail.shift();
-
-      const col = r.isPlayer ? 0x88eeff : r.color;
-      for (let i = 1; i < trail.length; i++) {
-        const alpha = (i / trail.length) * 0.35;
-        this.trailGfx.lineStyle(2, col, alpha);
-        this.trailGfx.lineBetween(trail[i-1].x, trail[i-1].y, trail[i].x, trail[i].y);
-      }
+  drawPalms() {
+    const g = this.add.graphics();
+    const palmSpots = [
+      {x:W*0.5, y:H*0.5}, {x:W*0.3,y:H*0.5}, {x:W*0.65,y:H*0.5}
+    ];
+    palmSpots.forEach(p => {
+      g.fillStyle(0x8B4513); g.fillRect(p.x-5, p.y-40, 10, 40);
+      g.fillStyle(0x228B22); g.fillCircle(p.x, p.y-45, 22);
+      g.fillStyle(0x32CD32); g.fillCircle(p.x-10, p.y-50, 14);
+      g.fillStyle(0x32CD32); g.fillCircle(p.x+10, p.y-50, 14);
     });
-
-    this.updateHUD();
-    this.checkFinish();
   }
 
-  // ─── Player input ─────────────────────────────────────────────────────────
-  updatePlayer(r, dt) {
-    const K = this.keys;
-    const up    = K.up.isDown    || K.W.isDown    || touch.up;
-    const down  = K.down.isDown  || K.S.isDown    || touch.down;
-    const left  = K.left.isDown  || K.A.isDown    || touch.left;
-    const right = K.right.isDown || K.D.isDown    || touch.right;
-    const boost = K.space.isDown || touch.boost;
-
-    if (up) {
-      r.speed = Math.min(r.speed + r.acceleration * dt, r.maxSpeed);
-    } else if (down) {
-      r.speed = Math.max(r.speed - r.acceleration * 1.5 * dt, 0);
-    } else {
-      r.speed = Math.max(r.speed - r.acceleration * 0.4 * dt, 0);
+  drawFinishLine() {
+    const g = this.add.graphics();
+    const fx = WAYPOINTS[0].x, fy = WAYPOINTS[0].y;
+    for(let i=0; i<8; i++) {
+      g.fillStyle(i%2===0 ? 0xffffff : 0x000000);
+      g.fillRect(fx-40+i*10, fy-5, 10, 10);
     }
-
-    if (left)  r.angle -= r.turnSpeed * dt * (r.speed / r.maxSpeed + 0.3);
-    if (right) r.angle += r.turnSpeed * dt * (r.speed / r.maxSpeed + 0.3);
-
-    // Boost
-    if (boost && r.boostCooldown <= 0 && !r.boostActive) {
-      r.boostActive = true;
-      r.boostTimer = 1.5;
-      r.boostCooldown = 6;
-    }
-    if (r.boostActive) {
-      r.speed = Math.min(r.speed + 600 * dt, r.maxSpeed * 1.6);
-      r.boostTimer -= dt;
-      if (r.boostTimer <= 0) r.boostActive = false;
-    }
-    r.boostCooldown = Math.max(0, r.boostCooldown - dt);
   }
 
-  // ─── AI control ───────────────────────────────────────────────────────────
-  updateAI(r, dt) {
-    const wp = this.waypoints[r.wpIndex];
-    const dx = wp.x - r.x;
-    const dy = wp.y - r.y;
-    const targetAngle = Math.atan2(dy, dx);
-    let angleDiff = targetAngle - r.angle;
-    while (angleDiff >  Math.PI) angleDiff -= Math.PI * 2;
-    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-
-    r.angle += Phaser.Math.Clamp(angleDiff, -r.turnSpeed * dt, r.turnSpeed * dt);
-    r.speed = Math.min(r.speed + r.acceleration * r.aiAggression * dt, r.maxSpeed * r.aiAggression);
-
-    // AI random boost
-    if (!r.boostActive && r.boostCooldown <= 0 && Math.random() < 0.005) {
-      r.boostActive = true;
-      r.boostTimer  = 1.2;
-      r.boostCooldown = 7 + Math.random() * 4;
-    }
-    if (r.boostActive) {
-      r.speed = Math.min(r.speed + 400 * dt, r.maxSpeed * 1.5);
-      r.boostTimer -= dt;
-      if (r.boostTimer <= 0) r.boostActive = false;
-    }
-    r.boostCooldown = Math.max(0, r.boostCooldown - dt);
+  drawBuoys() {
+    const g = this.buoyGfx;
+    g.clear();
+    WAYPOINTS.forEach(wp => {
+      g.fillStyle(0xffffff, 0.3); g.fillCircle(wp.x, wp.y, 16);
+      g.fillStyle(0xffdd00); g.fillCircle(wp.x, wp.y, 12);
+      g.fillStyle(0xff0000); g.fillCircle(wp.x, wp.y, 5);
+    });
   }
 
-  // ─── Move racer ───────────────────────────────────────────────────────────
-  moveRacer(r, dt) {
-    r.x += Math.cos(r.angle) * r.speed * dt;
-    r.y += Math.sin(r.angle) * r.speed * dt;
-    // Clamp to screen
-    r.x = Phaser.Math.Clamp(r.x, 10, W - 10);
-    r.y = Phaser.Math.Clamp(r.y, 10, H - 10);
+  activateBoost() {
+    if(!this.racing) return;
+    this.boost = true;
+    this.boostTimer = 120;
   }
 
-  // ─── Waypoint check ───────────────────────────────────────────────────────
-  checkWaypoint(r) {
-    if (r.finished) return;
-    const wp = this.waypoints[r.wpIndex];
-    const dist = Phaser.Math.Distance.Between(r.x, r.y, wp.x, wp.y);
-    if (dist < 48) {
-      r.wpIndex = (r.wpIndex + 1) % this.waypoints.length;
-      r.lapProgress++;
-      r.totalProgress = (r.lap - 1) * this.waypoints.length + r.lapProgress;
+  update(time, delta) {
+    // Animated water
+    this.waveOffset += 0.5;
+    this.water.clear();
+    for(let i=0; i<8; i++) {
+      const x = ((i * 150 + this.waveOffset * 2) % (W + 150)) - 150;
+      this.water.lineStyle(2, 0x00ccff, 0.3);
+      this.water.beginPath();
+      this.water.moveTo(x, 0);
+      this.water.lineTo(x + 100, H);
+      this.water.strokePath();
+    }
 
-      // Lap completion: waypoint 0 resets
-      if (r.wpIndex === 0) {
-        r.lapProgress = 0;
-        if (r.lap < TOTAL_LAPS) {
-          r.lap++;
-        } else if (!r.finished) {
-          r.finished = true;
-          const rank = this.allRacers.filter(x => x.finished).length;
-          r.finishRank = rank;
-          if (r.isPlayer) this.showResult(rank === 1 ? 'victory' : 'lose', rank);
-          else if (rank === 1 && !this.raceFinished) this.showResult('lose', 0);
+    // Countdown
+    if(!this.racing && !this.finished) {
+      this.countdownTimer += delta;
+      if(this.countdownTimer > 1000) {
+        this.countdownTimer = 0;
+        this.countdown--;
+        if(this.countdown <= 0) {
+          this.countdownText.setText('GO! 🏁');
+          this.countdownText.setColor('#00ff44');
+          this.time.delayedCall(600, () => { this.countdownText.setVisible(false); this.racing = true; });
+        } else {
+          this.countdownText.setText(String(this.countdown));
+          const colors = ['','#ff4444','#ffaa00','#ffff00'];
+          this.countdownText.setColor(colors[this.countdown] || '#fff');
         }
       }
+      return;
     }
-  }
 
-  // ─── HUD ─────────────────────────────────────────────────────────────────
-  updateHUD() {
-    const sorted = [...this.allRacers].sort((a, b) => b.totalProgress - a.totalProgress);
-    const playerPos = sorted.findIndex(r => r.isPlayer) + 1;
-    const ordinals = ['1ST', '2ND', '3RD', '4TH'];
-    const colors   = ['#ffd700', '#cccccc', '#cd7f32', '#ff4444'];
-    this.posText.setText(ordinals[playerPos - 1] || '4TH');
-    this.posText.setColor(colors[playerPos - 1] || '#ff4444');
+    if(this.finished) return;
 
-    this.lapText.setText(`LAP ${Math.min(this.player.lap, TOTAL_LAPS)} / ${TOTAL_LAPS}`);
+    // Player movement
+    const ps = this.playerState;
+    const turnSpeed = 0.04;
+    const maxSpeed = this.boost ? 6 : 3.5;
+    const accel = 0.12;
+    const friction = 0.96;
 
-    if (this.player.boostCooldown > 0) {
-      this.speedText.setText(`BOOST: ${this.player.boostCooldown.toFixed(1)}s`).setColor('#ff8800');
-    } else if (this.player.boostActive) {
-      this.speedText.setText('⚡ BOOSTING!').setColor('#ffff00');
+    if(this.keys.left.isDown || this.wasd.A.isDown || this.dpad.left) ps.angle -= turnSpeed;
+    if(this.keys.right.isDown || this.wasd.D.isDown || this.dpad.right) ps.angle += turnSpeed;
+    if(this.keys.up.isDown || this.wasd.W.isDown || this.dpad.up) {
+      ps.speed = Math.min(ps.speed + accel, maxSpeed);
+    } else if(this.keys.down.isDown || this.wasd.S.isDown || this.dpad.down) {
+      ps.speed = Math.max(ps.speed - accel, 0);
     } else {
-      this.speedText.setText('BOOST: READY').setColor('#00ff88');
+      ps.speed *= friction;
     }
+
+    ps.vx = Math.cos(ps.angle) * ps.speed;
+    ps.vy = Math.sin(ps.angle) * ps.speed;
+    this.player.x += ps.vx;
+    this.player.y += ps.vy;
+    this.player.rotation = ps.angle;
+
+    // Boost timer
+    if(this.boostTimer > 0) {
+      this.boostTimer--;
+      if(this.boostTimer <= 0) this.boost = false;
+      // Boost particles
+      if(Math.random() < 0.6) {
+        this.boostParticles.push({x:this.player.x - Math.cos(ps.angle)*25, y:this.player.y - Math.sin(ps.angle)*25, life:20, vx:(Math.random()-0.5)*2, vy:(Math.random()-0.5)*2});
+      }
+    }
+
+    // Wake particles
+    if(ps.speed > 0.5) {
+      this.wakes.push({x:this.player.x, y:this.player.y, life:15, alpha:0.6});
+    }
+
+    // Draw wakes
+    const wakeGfx = this.add.graphics();
+    this.wakes = this.wakes.filter(w => { w.life--; return w.life > 0; });
+    this.boostParticles = this.boostParticles.filter(p => { p.life--; p.x+=p.vx; p.y+=p.vy; return p.life > 0; });
+
+    // Redraw boat with tilt
+    this.drawBoatShape(this.player, 0, 0, this.player._mc, this.player._ac);
+
+    // AI movement
+    this.aiBoats.forEach(ai => {
+      const target = WAYPOINTS[ai.wp % WAYPOINTS.length];
+      const dx = target.x - ai.gfx.x;
+      const dy = target.y - ai.gfx.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if(dist < 30) {
+        ai.wp++;
+        if(ai.wp >= WAYPOINTS.length) { ai.wp = 0; ai.lap++; }
+      }
+      const angle = Math.atan2(dy, dx);
+      const spd = ai.speed + (ps.speed < 1 ? 0.5 : 0);
+      ai.gfx.x += Math.cos(angle) * spd;
+      ai.gfx.y += Math.sin(angle) * spd;
+      ai.gfx.rotation = angle;
+      if(Math.random() < 0.3) this.wakes.push({x:ai.gfx.x, y:ai.gfx.y, life:12, alpha:0.4});
+    });
+
+    // Check lap progress
+    const fpDist = Phaser.Math.Distance.Between(this.player.x, this.player.y, WAYPOINTS[0].x, WAYPOINTS[0].y);
+    // Simple lap check: if near waypoints, advance
+    const nextWP = WAYPOINTS[ps.wp % WAYPOINTS.length];
+    const wpDist = Phaser.Math.Distance.Between(this.player.x, this.player.y, nextWP.x, nextWP.y);
+    if(wpDist < 40) {
+      ps.wp++;
+      if(ps.wp >= WAYPOINTS.length) {
+        ps.wp = 0;
+        ps.lap++;
+        if(ps.lap >= 3) { this.finishRace(true); return; }
+        this.lapText.setText('LAP ' + (ps.lap+1) + '/3');
+      }
+    }
+
+    // Check if AI won
+    const aiLaps = this.aiBoats.map(a => a.lap);
+    if(Math.max(...aiLaps) >= 3) { this.finishRace(false); return; }
+
+    // Update position HUD
+    const myProgress = ps.lap * 100 + ps.wp;
+    const aiProgresses = this.aiBoats.map(a => a.lap * 100 + a.wp);
+    const pos = 1 + aiProgresses.filter(p => p > myProgress).length;
+    const medals = ['','🥇','🥈','🥉','4th'];
+    this.posText.setText(medals[pos] + ' ' + ['','1st','2nd','3rd','4th'][pos]);
+
+    // Speed bar
+    this.speedBar.clear();
+    this.speedBar.fillStyle(0x000000, 0.5);
+    this.speedBar.fillRoundedRect(W/2-75, H-30, 150, 16, 8);
+    this.speedBar.fillStyle(this.boost ? 0xff8800 : 0x00ff88);
+    this.speedBar.fillRoundedRect(W/2-73, H-28, (ps.speed/6)*146, 12, 6);
   }
 
-  // ─── Result screen ────────────────────────────────────────────────────────
-  showResult(type, rank) {
-    this.raceFinished = true;
-    const overlay = this.add.rectangle(W/2, H/2, W, H, 0x000000, 0.72).setDepth(30);
+  finishRace(won) {
+    this.finished = true;
+    this.racing = false;
+    const overlay = this.add.graphics().setDepth(20);
+    overlay.fillStyle(0x000000, 0.75);
+    overlay.fillRect(0, 0, W, H);
 
-    const title = type === 'victory' ? '🏆 YOU WIN!' : `YOU FINISHED ${['','1ST','2ND','3RD','4TH'][rank] || rank + 'TH'}`;
-    const tColor = type === 'victory' ? '#ffd700' : '#ff4444';
+    const msg = won ? '🏆 YOU WIN!' : '😢 YOU LOST!';
+    const col = won ? '#ffd700' : '#ff6666';
+    this.add.text(W/2, H/2-80, msg, {fontSize:'52px', fontStyle:'bold', color:col, stroke:'#000', strokeThickness:6}).setDepth(21).setOrigin(0.5);
 
-    this.add.text(W/2, H/2 - 80, title, {
-      fontFamily: 'Arial Black, Arial',
-      fontSize: '48px',
-      color: tColor,
-      stroke: '#000',
-      strokeThickness: 6,
-    }).setOrigin(0.5).setDepth(31);
-
-    this.add.text(W/2, H/2 - 20, type === 'victory' ? 'Congratulations! 🎉' : 'Better luck next time!', {
-      fontFamily: 'Arial',
-      fontSize: '22px',
-      color: '#ffffff',
-      stroke: '#000',
-      strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(31);
+    if(won) {
+      // Fireworks
+      for(let i=0; i<5; i++) {
+        this.time.delayedCall(i*200, () => {
+          const fx = Math.random()*W, fy = Math.random()*H*0.6;
+          for(let j=0; j<12; j++) {
+            const a = (j/12)*Math.PI*2;
+            const speed = 3+Math.random()*3;
+            this.boostParticles.push({x:fx, y:fy, life:40, vx:Math.cos(a)*speed, vy:Math.sin(a)*speed});
+          }
+        });
+      }
+    }
 
     // Restart button
-    const btn = this.add.rectangle(W/2, H/2 + 60, 220, 56, 0x00aa44).setInteractive().setDepth(31);
-    btn.on('pointerover', () => btn.setFillStyle(0x00cc55));
-    btn.on('pointerout',  () => btn.setFillStyle(0x00aa44));
-    btn.on('pointerdown', () => this.scene.restart());
-    this.add.text(W/2, H/2 + 60, '▶ RACE AGAIN', {
-      fontFamily: 'Arial Black, Arial',
-      fontSize: '22px',
-      color: '#ffffff',
-      stroke: '#000',
-      strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(32);
+    const restartBtn = this.add.text(W/2, H/2+20, '▶ PLAY AGAIN', {fontSize:'28px', fontStyle:'bold', color:'#fff', backgroundColor:'#00aa44', padding:{x:20,y:10}}).setDepth(21).setOrigin(0.5).setInteractive({useHandCursor:true});
+    restartBtn.on('pointerdown', () => { this.scene.restart(); });
+
+    const menuBtn = this.add.text(W/2, H/2+90, '🏠 Main Menu', {fontSize:'22px', color:'#00d4ff', stroke:'#000', strokeThickness:3}).setDepth(21).setOrigin(0.5).setInteractive({useHandCursor:true});
+    menuBtn.on('pointerdown', () => { window.location.href='index.html'; });
   }
 }
 
-// ─── PHASER CONFIG ────────────────────────────────────────────────────────────
 const config = {
   type: Phaser.AUTO,
   width: W,
   height: H,
-  backgroundColor: '#0a3d6b',
-  parent: 'game-container',
-  scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: W,
-    height: H,
-  },
-  physics: { default: 'arcade', arcade: { debug: false } },
-  scene: [RaceScene],
+  backgroundColor: '#0a1628',
+  scene: RaceScene,
+  parent: document.body,
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }
 };
 
-const game = new Phaser.Game(config);
+new Phaser.Game(config);
 </script>
 </body>
 </html>
-
-<!-- v1774810429 -->
