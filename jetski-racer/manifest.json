@@ -1,0 +1,11 @@
+{
+  "name": "Alberto's Jet Ski Racer",
+  "short_name": "Jet Ski Racer",
+  "start_url": "./",
+  "display": "fullscreen",
+  "background_color": "#0a2a5e",
+  "theme_color": "#0a2a5e",
+  "orientation": "landscape",
+  "description": "Fast colorful jet ski racing across the ocean with touch controls and power-ups.",
+  "icons": []
+}
