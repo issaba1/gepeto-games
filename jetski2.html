@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🏄 Jetski ULTRA</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#050510;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    height:100vh;
+    overflow:hidden;
+    font-family:'Segoe UI',system-ui,sans-serif;
+    touch-action:none;
+    user-select:none;
+  }
+  canvas {
+    display:block;
+    max-width:100vw;
+    max-height:100vh;
+    image-rendering:crisp-edges;
+  }
+  #back-btn {
+    position:fixed;
+    top:10px; left:10px;
+    background:rgba(0,212,255,0.12);
+    border:1px solid rgba(0,212,255,0.4);
+    color:#00d4ff;
+    padding:6px 14px;
+    border-radius:20px;
+    font-size:0.82rem;
+    cursor:pointer;
+    z-index:100;
+    text-decoration:none;
+    font-weight:700;
+    letter-spacing:0.05em;
+    backdrop-filter:blur(4px);
+  }
+</style>
+</head>
+<body>
+<a href="index.html" id="back-btn">← LOBBY</a>
+<canvas id="c"></canvas>
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+//  JETSKI ULTRA — built with Claude Code Game Studios agent design principles
+//  Design framework: MDA (Mechanics→Dynamics→Aesthetics)
+//  Target aesthetics: Speed Rush, Challenge, Discovery
+//  Flow state maintained via sawtooth difficulty curve
+//  SDT: Competence (skill scoring), Autonomy (3 lanes), Relatedness (leaderboard)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// ── RESPONSIVE CANVAS ────────────────────────────────────────────────────────
+function resize() {
+  const asp = 9/16;
+  const maxH = window.innerHeight;
+  const maxW = window.innerWidth;
+  let h = maxH, w = h * asp;
+  if (w > maxW) { w = maxW; h = w / asp; }
+  canvas.width  = Math.floor(w);
+  canvas.height = Math.floor(h);
+}
+resize();
+window.addEventListener('resize', resize);
+const W = () => canvas.width;
+const H = () => canvas.height;
+
+// ── CONSTANTS ────────────────────────────────────────────────────────────────
+const LANE_COUNT   = 3;
+const GRAVITY      = 0.55;   // tuning knob — feel knob
+const JUMP_POWER   = -13;    // tuning knob — feel knob
+const BASE_SPEED   = 4.5;    // tuning knob — curve knob
+const SPEED_SCALE  = 0.08;   // tuning knob — curve knob (speed per score point)
+const BOOST_MULT   = 1.8;    // tuning knob — feel knob
+const BOOST_MAX    = 3.0;    // tuning knob — gate knob
+const COMBO_WINDOW = 120;    // frames before combo resets — gate knob
+
+// ── PERSISTENT STATE ─────────────────────────────────────────────────────────
+const LS = {
+  get best()  { return parseInt(localStorage.getItem('ju_best')  || '0'); },
+  set best(v) { localStorage.setItem('ju_best', v); },
+  get coins() { return parseInt(localStorage.getItem('ju_coins') || '0'); },
+  set coins(v){ localStorage.setItem('ju_coins', v); },
+};
+
+// ── GAME STATE ───────────────────────────────────────────────────────────────
+let gs; // game state object — reset each run
+
+function newGs() {
+  return {
+    phase:      'start',   // start | playing | dead
+    frame:      0,
+    score:      0,
+    coins:      0,
+    bestScore:  LS.best,
+    combo:      0,
+    comboTimer: 0,
+    speed:      BASE_SPEED,
+    boost:      0,
+    boostTimer: 0,
+
+    // ── Lane system (SDT: Autonomy — player always has 3 meaningful choices)
+    lane:       1,          // 0=left 1=center 2=right
+    laneY:      0,          // computed each frame from laneIndex
+    onGround:   true,
+    velY:       0,
+    jumpCount:  0,          // double-jump allowed
+
+    // ── Objects
+    obstacles:  [],
+    coins_objs: [],
+    wakes:      [],         // trail wake particles
+    particles:  [],
+    stars:      [],
+
+    // ── Input state
+    swipeStartX: null,
+    swipeStartY: null,
+    leftDown:   false,
+    rightDown:  false,
+
+    // ── Scroll
+    bgScroll:   0,
+    waveOff:    0,
+
+    // ── Spawn timing
+    nextObstacle: 80,
+    nextCoin:     50,
+
+    // ── Difficulty zone (sawtooth curve as per flow state design)
+    zone:       1,
+    zoneTimer:  0,
+  };
+}
+gs = newGs();
+
+// ── PRE-COMPUTE STAR FIELD ────────────────────────────────────────────────────
+function buildStars() {
+  gs.stars = [];
+  for (let i = 0; i < 60; i++) {
+    gs.stars.push({
+      x: Math.random(),
+      y: Math.random() * 0.55,
+      r: Math.random() * 1.4 + 0.3,
+      twinkle: Math.random() * Math.PI * 2,
+    });
+  }
+}
+buildStars();
+
+// ── LANE HELPERS ─────────────────────────────────────────────────────────────
+function laneX(i) {
+  const pad = W() * 0.15;
+  const slot = (W() - pad * 2) / LANE_COUNT;
+  return pad + slot * i + slot / 2;
+}
+function groundY() { return H() * 0.72; }
+function laneGroundY() { return groundY(); }
+
+// ── INPUT ─────────────────────────────────────────────────────────────────────
+function doJump() {
+  if (gs.phase === 'start') { startGame(); return; }
+  if (gs.phase === 'dead')  { startGame(); return; }
+  if (gs.onGround) {
+    gs.velY = JUMP_POWER * (H() / 800);
+    gs.onGround = false;
+    gs.jumpCount = 1;
+    spawnSplash(laneX(gs.lane), groundY(), '#00d4ff');
+  } else if (gs.jumpCount < 2) {
+    gs.velY = JUMP_POWER * 0.85 * (H() / 800);
+    gs.jumpCount = 2;
+    spawnSplash(laneX(gs.lane), gs.laneY, '#aaddff');
+  }
+}
+
+function doLeft() {
+  if (gs.phase !== 'playing') return;
+  if (gs.lane > 0) gs.lane--;
+}
+function doRight() {
+  if (gs.phase !== 'playing') return;
+  if (gs.lane < LANE_COUNT - 1) gs.lane++;
+}
+function doBoost() {
+  if (gs.phase !== 'playing') return;
+  if (gs.boost >= 1.0) {
+    gs.boost = 0;
+    gs.boostTimer = 90;
+  }
+}
+
+// Keyboard
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); doJump(); }
+  if (e.code === 'ArrowLeft')  { e.preventDefault(); doLeft(); }
+  if (e.code === 'ArrowRight') { e.preventDefault(); doRight(); }
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { doBoost(); }
+});
+
+// Touch — tap = jump, swipe L/R = change lane, swipe up = jump, two-finger = boost
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (e.touches.length >= 2) { doBoost(); return; }
+  const t = e.touches[0];
+  gs.swipeStartX = t.clientX;
+  gs.swipeStartY = t.clientY;
+}, {passive:false});
+
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  if (gs.swipeStartX === null) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - gs.swipeStartX;
+  const dy = t.clientY - gs.swipeStartY;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  if (dist < 12) {
+    doJump();
+  } else if (Math.abs(dx) > Math.abs(dy)) {
+    dx < 0 ? doLeft() : doRight();
+  } else if (dy < 0) {
+    doJump();
+  }
+  gs.swipeStartX = null;
+  gs.swipeStartY = null;
+}, {passive:false});
+
+// Mouse (desktop testing)
+canvas.addEventListener('mousedown', e => { gs.swipeStartX = e.clientX; gs.swipeStartY = e.clientY; });
+canvas.addEventListener('mouseup', e => {
+  if (gs.swipeStartX === null) return;
+  const dx = e.clientX - gs.swipeStartX;
+  const dy = e.clientY - gs.swipeStartY;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  if (dist < 12) { doJump(); }
+  else if (Math.abs(dx) > Math.abs(dy)) { dx < 0 ? doLeft() : doRight(); }
+  gs.swipeStartX = null;
+});
+
+// ── PARTICLE HELPERS ──────────────────────────────────────────────────────────
+function spawnSplash(x, y, color, n=10) {
+  for (let i = 0; i < n; i++) {
+    gs.particles.push({
+      x, y,
+      vx: (Math.random()-0.5)*5,
+      vy: -(Math.random()*4+1),
+      life: 1, decay: 0.04 + Math.random()*0.03,
+      r: Math.random()*3+1,
+      color,
+    });
+  }
+}
+function spawnExplosion(x, y) {
+  for (let i = 0; i < 30; i++) {
+    const ang = Math.random()*Math.PI*2;
+    const spd = Math.random()*7+1;
+    gs.particles.push({
+      x, y,
+      vx: Math.cos(ang)*spd,
+      vy: Math.sin(ang)*spd,
+      life:1, decay:0.025+Math.random()*0.02,
+      r: Math.random()*4+2,
+      color: ['#ff4400','#ffd700','#ff8800','#ffffff'][Math.floor(Math.random()*4)],
+    });
+  }
+}
+function spawnCoinPop(x, y) {
+  for (let i = 0; i < 8; i++) {
+    gs.particles.push({
+      x, y,
+      vx: (Math.random()-0.5)*4,
+      vy: -(Math.random()*3+2),
+      life:1, decay:0.05,
+      r:3,
+      color:'#ffd700',
+    });
+  }
+}
+
+// ── SPAWN FUNCTIONS ───────────────────────────────────────────────────────────
+function spawnObstacle() {
+  const zone = gs.zone;
+  // Pattern picker — zone 1=simple, zone 2=gaps, zone 3=sequences
+  const types = zone < 2
+    ? ['rock','buoy','wave']
+    : zone < 3
+    ? ['rock','rock','buoy','wave','wavePair']
+    : ['rock','buoy','wave','wavePair','rockRow'];
+
+  const type = types[Math.floor(Math.random() * types.length)];
+  const obLane = Math.floor(Math.random() * LANE_COUNT);
+
+  const base = { x: W() + 60, lane: obLane, type, frame: 0 };
+
+  if (type === 'wavePair') {
+    // Two lanes blocked — at least one gap
+    const blockedA = Math.floor(Math.random() * LANE_COUNT);
+    let blockedB = (blockedA + 1 + Math.floor(Math.random()*2)) % LANE_COUNT;
+    gs.obstacles.push({...base, lane:blockedA, type:'wave'});
+    gs.obstacles.push({...base, x: W()+62, lane:blockedB, type:'rock'});
+    return;
+  }
+  if (type === 'rockRow') {
+    // All three lanes blocked — use tall rock that must be jumped
+    for (let l=0; l<LANE_COUNT; l++) {
+      gs.obstacles.push({...base, lane:l, type:'rockTall'});
+    }
+    return;
+  }
+
+  gs.obstacles.push(base);
+}
+
+function spawnCoin() {
+  const lane = Math.floor(Math.random()*LANE_COUNT);
+  const airborne = Math.random() < 0.4;
+  gs.coins_objs.push({
+    x: W() + 40,
+    lane,
+    yOff: airborne ? -H()*0.14 : 0,  // coin floating above ground = more risk/reward
+    frame: 0,
+  });
+}
+
+// ── GAME LOOP ────────────────────────────────────────────────────────────────
+function startGame() {
+  gs = newGs();
+  buildStars();
+  gs.phase = 'playing';
+}
+
+function obSize() { return W() * 0.055; }
+function playerSize() { return W() * 0.065; }
+
+function update() {
+  if (gs.phase !== 'playing') return;
+
+  gs.frame++;
+  gs.bgScroll += gs.speed * 0.8;
+  gs.waveOff  += gs.speed * 0.6;
+
+  // ── Speed curve (logarithmic — fast early growth, then plateau feel)
+  gs.score = Math.floor(gs.frame / 60);
+  gs.speed = BASE_SPEED + gs.score * SPEED_SCALE + (gs.boostTimer > 0 ? gs.speed*(BOOST_MULT-1)*0.05 : 0);
+  gs.speed = Math.min(gs.speed, BASE_SPEED * 3.5);
+
+  // ── Boost
+  if (gs.boostTimer > 0) gs.boostTimer--;
+
+  // ── Zone / difficulty sawtooth (flow state design — tension builds then releases)
+  gs.zoneTimer++;
+  if (gs.zoneTimer > 600) { gs.zone = Math.min(gs.zone+1, 4); gs.zoneTimer = 0; }
+
+  // ── Combo timer
+  if (gs.comboTimer > 0) gs.comboTimer--;
+  else gs.combo = 0;
+
+  // ── Physics
+  const gY = laneGroundY();
+  const targetX = laneX(gs.lane);
+  // Smooth lane switching — lerp X toward target lane center
+  if (!gs._px) gs._px = targetX;
+  gs._px += (targetX - gs._px) * 0.18;
+
+  gs.velY += GRAVITY * (H() / 800);
+  gs.laneY = (gs.laneY || gY);
+  gs.laneY += gs.velY;
+
+  if (gs.laneY >= gY) {
+    gs.laneY = gY;
+    gs.velY = 0;
+    gs.onGround = true;
+    gs.jumpCount = 0;
+  } else {
+    gs.onGround = false;
+  }
+
+  // ── Wake trail
+  if (gs.onGround && gs.frame % 3 === 0) {
+    gs.wakes.push({ x: gs._px - W()*0.04, y: gY, life:1, decay:0.05 });
+    gs.wakes.push({ x: gs._px + W()*0.04, y: gY, life:1, decay:0.05 });
+  }
+  gs.wakes.forEach(w => { w.x -= gs.speed*0.3; w.life -= w.decay; });
+  gs.wakes = gs.wakes.filter(w => w.life > 0);
+
+  // ── Spawn objects
+  gs.nextObstacle--;
+  if (gs.nextObstacle <= 0) {
+    spawnObstacle();
+    const spawnRate = Math.max(50, 130 - gs.score * 1.2 - gs.zone * 8);
+    gs.nextObstacle = spawnRate + Math.random() * 30 - 15;
+  }
+  gs.nextCoin--;
+  if (gs.nextCoin <= 0) {
+    spawnCoin();
+    gs.nextCoin = 60 + Math.random()*40;
+  }
+
+  // ── Move obstacles
+  gs.obstacles.forEach(o => { o.x -= gs.speed; o.frame++; });
+  gs.obstacles = gs.obstacles.filter(o => o.x > -80);
+
+  // ── Move coins
+  gs.coins_objs.forEach(c => { c.x -= gs.speed; c.frame++; });
+  gs.coins_objs = gs.coins_objs.filter(c => c.x > -40);
+
+  // ── Particles
+  gs.particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy;
+    p.vy += 0.2;
+    p.life -= p.decay;
+  });
+  gs.particles = gs.particles.filter(p => p.life > 0);
+
+  // ── Coin collection
+  const px = gs._px, py = gs.laneY;
+  const pr = playerSize();
+  gs.coins_objs = gs.coins_objs.filter(c => {
+    const cy = laneGroundY() + c.yOff;
+    const dx = px - c.x, dy = py - cy;
+    if (Math.sqrt(dx*dx + dy*dy) < pr) {
+      spawnCoinPop(c.x, cy);
+      gs.coins++;
+      gs.combo++;
+      gs.comboTimer = COMBO_WINDOW;
+      gs.boost = Math.min(gs.boost + 0.33, BOOST_MAX);
+      return false;
+    }
+    return true;
+  });
+
+  // ── Collision detection (precise hitbox)
+  const hitR = pr * 0.6;  // slightly forgiving
+  for (const o of gs.obstacles) {
+    const oy = obGroundY(o);
+    const oh = obHeight(o);
+    const ow = obWidth(o);
+    const ox = o.x + ow/2;
+    const dist = Math.sqrt((px-ox)**2 + (py-oy+oh/2)**2);
+    // Only collide if in same lane (or close enough)
+    const laneDist = Math.abs(gs._px - laneX(o.lane));
+    if (laneDist < pr*1.2 && dist < hitR + Math.min(ow,oh)*0.45) {
+      // Hit!
+      if (gs.score > LS.best) LS.best = gs.score;
+      LS.coins += gs.coins;
+      gs.bestScore = LS.best;
+      spawnExplosion(px, py);
+      gs.phase = 'dead';
+      return;
+    }
+  }
+}
+
+// ── OBJECT SIZE HELPERS ───────────────────────────────────────────────────────
+function obGroundY(o) { return laneGroundY(); }
+function obHeight(o) {
+  if (o.type==='rock')     return H()*0.07;
+  if (o.type==='rockTall') return H()*0.14;
+  if (o.type==='buoy')     return H()*0.055;
+  if (o.type==='wave')     return H()*0.10;
+  return H()*0.08;
+}
+function obWidth(o) { return W()*0.055; }
+
+// ── DRAW ──────────────────────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0,0,W(),H());
+
+  drawSky();
+  drawLaneMarkers();
+  drawCoins();
+  drawWater();
+  drawWakes();
+  drawObstacles();
+  drawPlayer();
+  drawParticles();
+  drawHUD();
+
+  if (gs.phase === 'start') drawStartScreen();
+  if (gs.phase === 'dead')  drawDeadScreen();
+}
+
+function drawSky() {
+  const gY = groundY();
+  const g = ctx.createLinearGradient(0,0,0,gY);
+  const bst = gs.boostTimer > 0;
+  g.addColorStop(0, bst ? '#1a0030' : '#050510');
+  g.addColorStop(0.6, bst ? '#1a0044' : '#071832');
+  g.addColorStop(1, bst ? '#2a0060' : '#0d2a44');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W(), gY);
+
+  // Stars
+  gs.stars.forEach(s => {
+    s.twinkle += 0.03;
+    ctx.save();
+    ctx.globalAlpha = 0.4 + 0.4*Math.sin(s.twinkle);
+    ctx.beginPath();
+    ctx.arc(s.x*W(), s.y*H(), s.r, 0, Math.PI*2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // Moon
+  const moonX = W()*0.82, moonY = H()*0.1, moonR = W()*0.038;
+  ctx.save();
+  const mg = ctx.createRadialGradient(moonX,moonY,0,moonX,moonY,moonR*2);
+  mg.addColorStop(0,'rgba(255,230,150,0.3)');
+  mg.addColorStop(1,'rgba(255,230,150,0)');
+  ctx.fillStyle = mg;
+  ctx.beginPath();
+  ctx.arc(moonX,moonY,moonR*2,0,Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#ffe696';
+  ctx.beginPath();
+  ctx.arc(moonX,moonY,moonR,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+
+  // Distant horizon glow
+  const hg = ctx.createLinearGradient(0, gY*0.75, 0, gY);
+  hg.addColorStop(0,'rgba(0,80,160,0)');
+  hg.addColorStop(1,'rgba(0,120,220,0.15)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, gY*0.75, W(), gY*0.25);
+}
+
+function drawLaneMarkers() {
+  // Subtle lane dividers below waterline — guide visual affordance (SDT:Autonomy)
+  const gY = groundY();
+  ctx.save();
+  ctx.globalAlpha = 0.12;
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6,18]);
+  for (let i=1; i<LANE_COUNT; i++) {
+    const x = laneX(i-1) + (laneX(i)-laneX(i-1))/2;
+    ctx.beginPath();
+    ctx.moveTo(x, gY);
+    ctx.lineTo(x, H());
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawCoins() {
+  const gY = laneGroundY();
+  gs.coins_objs.forEach(c => {
+    const cx = c.x;
+    const cy = gY + c.yOff - H()*0.02;
+    const r = W()*0.022;
+    c.frame++;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    // Coin spin (scaleX oscillates)
+    const scaleX = Math.abs(Math.cos(c.frame*0.07));
+    ctx.scale(scaleX, 1);
+
+    const cg = ctx.createRadialGradient(0,0,0,0,0,r);
+    cg.addColorStop(0,'#fff7a0');
+    cg.addColorStop(0.5,'#ffd700');
+    cg.addColorStop(1,'#cc8800');
+    ctx.fillStyle = cg;
+    ctx.beginPath();
+    ctx.arc(0,0,r,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = '#fff7a0';
+    ctx.font = `bold ${r*1.2}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('$',0,1);
+    ctx.restore();
+
+    // Float indicator for airborne coins
+    if (c.yOff < 0) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,215,0,0.3)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3,5]);
+      ctx.beginPath();
+      ctx.moveTo(cx, gY - H()*0.01);
+      ctx.lineTo(cx, cy + r);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  });
+}
+
+function drawWater() {
+  const gY = groundY();
+  const wg = ctx.createLinearGradient(0, gY, 0, H());
+  const bst = gs.boostTimer > 0;
+  wg.addColorStop(0, bst ? '#1a0066' : '#003366');
+  wg.addColorStop(1, bst ? '#0d0033' : '#001122');
+  ctx.fillStyle = wg;
+  ctx.fillRect(0, gY, W(), H()-gY);
+
+  // Wave surface lines — animated
+  ctx.lineWidth = 1.5;
+  for (let row=0; row<5; row++) {
+    ctx.strokeStyle = `rgba(0,${180-row*20},255,${0.18-row*0.02})`;
+    ctx.beginPath();
+    for (let x=-20; x<=W()+20; x+=6) {
+      const y = gY + row*9 + Math.sin((x + gs.waveOff*1.2 + row*40)*0.045)*4;
+      x===-20 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+
+  // Reflection of moon on water
+  const moonX = W()*0.82;
+  const refG = ctx.createLinearGradient(moonX-W()*0.05, gY, moonX+W()*0.05, gY+H()*0.12);
+  refG.addColorStop(0,'rgba(255,230,100,0)');
+  refG.addColorStop(0.5,'rgba(255,230,100,0.08)');
+  refG.addColorStop(1,'rgba(255,230,100,0)');
+  ctx.fillStyle = refG;
+  ctx.fillRect(moonX-W()*0.05, gY, W()*0.1, H()*0.12);
+}
+
+function drawWakes() {
+  gs.wakes.forEach(w => {
+    ctx.save();
+    ctx.globalAlpha = w.life * 0.5;
+    ctx.beginPath();
+    ctx.arc(w.x, w.y, W()*0.012, 0, Math.PI*2);
+    ctx.fillStyle = '#00d4ff';
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawObstacles() {
+  const gY = laneGroundY();
+  gs.obstacles.forEach(o => {
+    const ox = o.x + obWidth(o)/2;
+    const oy = gY;
+    const oh = obHeight(o);
+    const ow = obWidth(o);
+    ctx.save();
+    ctx.translate(ox, oy);
+
+    if (o.type === 'rock' || o.type === 'rockTall') {
+      const h = oh;
+      // Rock shape
+      ctx.fillStyle = '#5a6a7a';
+      ctx.beginPath();
+      ctx.moveTo(-ow*0.5, 0);
+      ctx.lineTo(-ow*0.3, -h);
+      ctx.lineTo(ow*0.3, -h*1.1);
+      ctx.lineTo(ow*0.5, -h*0.6);
+      ctx.lineTo(ow*0.4, 0);
+      ctx.closePath();
+      ctx.fill();
+      // Highlight
+      ctx.fillStyle = 'rgba(180,200,220,0.25)';
+      ctx.beginPath();
+      ctx.moveTo(-ow*0.2, -h*0.5);
+      ctx.lineTo(-ow*0.05, -h*0.85);
+      ctx.lineTo(ow*0.1, -h*0.6);
+      ctx.closePath();
+      ctx.fill();
+      // Water splash at base
+      ctx.strokeStyle = 'rgba(0,180,255,0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(-ow*0.6, 0, ow*0.3, Math.PI*1.1, Math.PI*1.9);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(ow*0.6, 0, ow*0.3, Math.PI*1.1, Math.PI*1.9);
+      ctx.stroke();
+
+    } else if (o.type === 'buoy') {
+      const r = ow*0.5;
+      // Buoy ball
+      const bg = ctx.createRadialGradient(-r*0.3,-oh*0.3,0,0,0,r);
+      bg.addColorStop(0,'#ff9999');
+      bg.addColorStop(0.5,'#ff3333');
+      bg.addColorStop(1,'#aa0000');
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.arc(0, -r, r, 0, Math.PI*2);
+      ctx.fill();
+      // Stripes
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = r*0.25;
+      ctx.beginPath();
+      ctx.moveTo(-r*0.7, -r);
+      ctx.lineTo(r*0.7, -r);
+      ctx.stroke();
+      // Chain
+      ctx.strokeStyle = '#aaaaaa';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -r*0.3);
+      ctx.stroke();
+      // Ring
+      ctx.strokeStyle = '#ffdd44';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0,-r,r*1.05,0,Math.PI*2);
+      ctx.stroke();
+
+    } else if (o.type === 'wave') {
+      // Big wave obstacle
+      const waveH = oh;
+      const wOff = o.frame * 0.08;
+      ctx.strokeStyle = '#00aaff';
+      ctx.lineWidth = 3;
+      ctx.fillStyle = 'rgba(0,120,220,0.25)';
+      ctx.beginPath();
+      ctx.moveTo(-ow*0.6, 0);
+      for (let xi=-ow*0.6; xi<=ow*0.6; xi+=2) {
+        const yi = -waveH * Math.pow(Math.sin(((xi+ow*0.6)/(ow*1.2))*Math.PI), 0.8);
+        ctx.lineTo(xi, yi + Math.sin(xi*0.3+wOff)*waveH*0.1);
+      }
+      ctx.lineTo(ow*0.6, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // Foam top
+      ctx.strokeStyle = 'rgba(200,240,255,0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-ow*0.6, -waveH);
+      for (let xi=-ow*0.6; xi<=ow*0.6; xi+=3) {
+        ctx.lineTo(xi, -waveH + Math.sin(xi*0.5+wOff*2)*waveH*0.12);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  });
+}
+
+function drawPlayer() {
+  const px = gs._px || laneX(gs.lane);
+  const py = gs.laneY || laneGroundY();
+  const s  = playerSize();
+  const bst = gs.boostTimer > 0;
+
+  ctx.save();
+  ctx.translate(px, py);
+
+  // Engine glow when boosting
+  if (bst) {
+    const glow = ctx.createRadialGradient(0,0,0,0,0,s*2);
+    glow.addColorStop(0,'rgba(160,0,255,0.5)');
+    glow.addColorStop(1,'rgba(160,0,255,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(0,0,s*2,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  // Wake splash jets
+  if (gs.onGround) {
+    ctx.strokeStyle = bst ? 'rgba(180,0,255,0.5)' : 'rgba(0,212,255,0.4)';
+    ctx.lineWidth = 2;
+    for (let i=0; i<3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(-s*0.7, i*3 - s*0.08);
+      ctx.lineTo(-s*1.5 - i*4, i*5 - s*0.25);
+      ctx.stroke();
+    }
+  }
+
+  // Jetski hull
+  const hullColor = bst ? '#cc44ff' : '#00d4ff';
+  const hullDark  = bst ? '#880088' : '#007aaa';
+  ctx.fillStyle = hullColor;
+  ctx.beginPath();
+  ctx.ellipse(0, s*0.05, s*1.0, s*0.32, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Hull accent stripe
+  ctx.fillStyle = hullDark;
+  ctx.beginPath();
+  ctx.ellipse(0, s*0.05, s*0.65, s*0.14, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Nose
+  ctx.fillStyle = hullColor;
+  ctx.beginPath();
+  ctx.moveTo(s*0.85, -s*0.12);
+  ctx.lineTo(s*1.35, s*0.05);
+  ctx.lineTo(s*0.85, s*0.22);
+  ctx.closePath();
+  ctx.fill();
+
+  // Handlebars
+  ctx.strokeStyle = '#888899';
+  ctx.lineWidth = s*0.12;
+  ctx.beginPath();
+  ctx.moveTo(s*0.2, -s*0.42);
+  ctx.lineTo(s*0.55, -s*0.42);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(s*0.35, -s*0.42);
+  ctx.lineTo(s*0.35, -s*0.25);
+  ctx.stroke();
+
+  // Rider body
+  ctx.fillStyle = '#ffd700';
+  ctx.beginPath();
+  ctx.ellipse(s*0.2, -s*0.62, s*0.14, s*0.14, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = '#ffd700';
+  ctx.lineWidth = s*0.12;
+  ctx.beginPath();
+  ctx.moveTo(s*0.2, -s*0.47);
+  ctx.lineTo(s*0.2, -s*0.18);
+  ctx.stroke();
+  // Rider arms
+  ctx.beginPath();
+  ctx.moveTo(s*0.05, -s*0.38);
+  ctx.lineTo(s*0.4, -s*0.42);
+  ctx.stroke();
+
+  // Helmet visor glow
+  ctx.fillStyle = bst ? '#ff88ff' : '#00d4ff';
+  ctx.beginPath();
+  ctx.ellipse(s*0.25, -s*0.64, s*0.06, s*0.05, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Engine exhaust sparks when boosting
+  if (bst && Math.random()<0.5) {
+    for (let i=0; i<3; i++) {
+      gs.particles.push({
+        x: px-s*1.1, y: py,
+        vx: -(Math.random()*3+2), vy:(Math.random()-0.5)*2,
+        life:0.8, decay:0.08, r:2,
+        color:['#ff44ff','#cc00ff','#ffffff'][i],
+      });
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawParticles() {
+  gs.particles.forEach(p => {
+    ctx.save();
+    ctx.globalAlpha = p.life;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawHUD() {
+  if (gs.phase !== 'playing') return;
+
+  const s = W()*0.045;
+
+  // Score
+  ctx.save();
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#00d4ff';
+  ctx.font = `bold ${s*1.1}px 'Segoe UI',sans-serif`;
+  ctx.fillText(`⏱ ${gs.score}s`, 14, 36);
+
+  // Best
+  ctx.fillStyle = '#ffd700';
+  ctx.font = `${s*0.8}px 'Segoe UI',sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.fillText(`BEST ${gs.bestScore}s`, W()-14, 36);
+
+  // Coins
+  ctx.fillStyle = '#ffd700';
+  ctx.textAlign = 'center';
+  ctx.font = `bold ${s*0.9}px 'Segoe UI',sans-serif`;
+  ctx.fillText(`💰 ${gs.coins}`, W()/2, 36);
+
+  // Combo
+  if (gs.combo >= 2) {
+    ctx.fillStyle = `rgba(255,220,0,${gs.comboTimer/COMBO_WINDOW})`;
+    ctx.font = `bold ${s*1.3}px 'Segoe UI',sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`×${gs.combo} COMBO!`, W()/2, H()*0.12);
+  }
+
+  // Boost bar
+  const bw = W()*0.38, bh = H()*0.018;
+  const bx = (W()-bw)/2, by = H()*0.88;
+  ctx.globalAlpha = 0.7;
+  ctx.fillStyle = '#222233';
+  ctx.beginPath();
+  roundRect(bx, by, bw, bh, bh/2);
+  ctx.fill();
+
+  const fill = Math.min(gs.boost / BOOST_MAX, 1);
+  const bColor = fill >= 1 ? '#ff44ff' : (gs.boostTimer>0 ? '#ff44ff' : '#00d4ff');
+  ctx.fillStyle = bColor;
+  ctx.beginPath();
+  roundRect(bx, by, bw*fill, bh, bh/2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Boost label
+  ctx.fillStyle = fill>=1 ? '#ff88ff' : '#6688aa';
+  ctx.font = `bold ${s*0.65}px 'Segoe UI',sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText(gs.boostTimer>0 ? '⚡ BOOST ACTIVE' : (fill>=1 ? '⚡ BOOST READY! (2-finger tap)' : '⚡ BOOST'), W()/2, by - bh);
+
+  // Zone indicator — subtle
+  ctx.fillStyle = 'rgba(0,212,255,0.3)';
+  ctx.font = `${s*0.6}px 'Segoe UI',sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.fillText(`ZONE ${gs.zone}`, W()-14, H()-12);
+
+  ctx.restore();
+}
+
+function roundRect(x,y,w,h,r) {
+  if (w<=0) return;
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);
+}
+
+function drawStartScreen() {
+  // Overlay
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0,0,W(),H());
+
+  const cx = W()/2;
+  ctx.textAlign = 'center';
+
+  // Title
+  ctx.save();
+  ctx.shadowColor = '#00d4ff';
+  ctx.shadowBlur = 20;
+  ctx.fillStyle = '#00d4ff';
+  ctx.font = `bold ${W()*0.13}px 'Segoe UI',sans-serif`;
+  ctx.fillText('JETSKI', cx, H()*0.28);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${W()*0.09}px 'Segoe UI',sans-serif`;
+  ctx.fillText('ULTRA', cx, H()*0.38);
+  ctx.restore();
+
+  // Controls
+  ctx.fillStyle = 'rgba(0,212,255,0.12)';
+  ctx.beginPath();
+  roundRect(W()*0.1, H()*0.44, W()*0.8, H()*0.24, 12);
+  ctx.fill();
+
+  ctx.fillStyle = '#aaccdd';
+  ctx.font = `${W()*0.042}px 'Segoe UI',sans-serif`;
+  const lines = ['↑ Tap / Space = Jump (double-jump!)', '← → Swipe / Arrow keys = Change lane', '2-finger tap / Shift = BOOST ⚡'];
+  lines.forEach((l,i) => ctx.fillText(l, cx, H()*0.5 + i*H()*0.065));
+
+  // Best score
+  ctx.fillStyle = '#ffd700';
+  ctx.font = `${W()*0.048}px 'Segoe UI',sans-serif`;
+  ctx.fillText(`🏆 BEST: ${gs.bestScore}s | 💰 ALL-TIME: ${LS.coins}`, cx, H()*0.74);
+
+  // CTA
+  ctx.fillStyle = '#00d4ff';
+  ctx.fillRect(W()*0.2, H()*0.80, W()*0.6, H()*0.09);
+  ctx.fillStyle = '#050510';
+  ctx.font = `bold ${W()*0.05}px 'Segoe UI',sans-serif`;
+  ctx.fillText('▶  TAP TO PLAY', cx, H()*0.865);
+}
+
+function drawDeadScreen() {
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0,0,W(),H());
+
+  const cx = W()/2;
+  ctx.textAlign = 'center';
+
+  ctx.save();
+  ctx.shadowColor = '#ff4400';
+  ctx.shadowBlur = 24;
+  ctx.fillStyle = '#ff6644';
+  ctx.font = `bold ${W()*0.11}px 'Segoe UI',sans-serif`;
+  ctx.fillText('WIPEOUT!', cx, H()*0.28);
+  ctx.restore();
+
+  const newBest = gs.score >= gs.bestScore && gs.score > 0;
+  ctx.fillStyle = newBest ? '#ffd700' : '#ffffff';
+  ctx.font = `bold ${W()*0.065}px 'Segoe UI',sans-serif`;
+  ctx.fillText(newBest ? `⭐ NEW BEST: ${gs.score}s!` : `Score: ${gs.score}s`, cx, H()*0.40);
+
+  ctx.fillStyle = '#aaaaaa';
+  ctx.font = `${W()*0.045}px 'Segoe UI',sans-serif`;
+  ctx.fillText(`Best: ${gs.bestScore}s`, cx, H()*0.50);
+
+  ctx.fillStyle = '#ffd700';
+  ctx.fillText(`Coins collected: 💰 ${gs.coins}`, cx, H()*0.59);
+  ctx.fillStyle = '#88aacc';
+  ctx.font = `${W()*0.038}px 'Segoe UI',sans-serif`;
+  ctx.fillText(`All-time bank: 💰 ${LS.coins}`, cx, H()*0.66);
+
+  ctx.fillStyle = '#00d4ff';
+  ctx.fillRect(W()*0.2, H()*0.74, W()*0.6, H()*0.09);
+  ctx.fillStyle = '#050510';
+  ctx.font = `bold ${W()*0.05}px 'Segoe UI',sans-serif`;
+  ctx.fillText('▶  TAP TO RETRY', cx, H()*0.80);
+}
+
+// ── MAIN LOOP ─────────────────────────────────────────────────────────────────
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
