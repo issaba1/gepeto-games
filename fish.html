@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🐠 Fish Feeder</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    touch-action: none;
+    user-select: none;
+  }
+  canvas {
+    display: block;
+    max-width: 100vw;
+    max-height: 100vh;
+    border: 2px solid #00d4ff44;
+    border-radius: 12px;
+  }
+  #back-btn {
+    position: fixed;
+    top: 12px; left: 12px;
+    background: #00d4ff22;
+    border: 1px solid #00d4ff55;
+    color: #00d4ff;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    z-index: 100;
+    text-decoration: none;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+<a href="index.html" id="back-btn">← LOBBY</a>
+<canvas id="c"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  const maxW = Math.min(window.innerWidth, 480);
+  const maxH = window.innerHeight - 20;
+  canvas.width = maxW;
+  canvas.height = Math.min(maxH, maxW * 1.5);
+}
+resize();
+window.addEventListener('resize', resize);
+
+const W = () => canvas.width;
+const H = () => canvas.height;
+
+// Fish colors (bright, kid-friendly)
+const FISH_COLORS = [
+  { body: '#ff6b35', fin: '#ff4500', eye: '#fff' },
+  { body: '#ffd700', fin: '#ffaa00', eye: '#fff' },
+  { body: '#00d4ff', fin: '#0090cc', eye: '#fff' },
+  { body: '#ff69b4', fin: '#ff1493', eye: '#fff' },
+  { body: '#7fff00', fin: '#32cd32', eye: '#fff' },
+  { body: '#ff4444', fin: '#cc0000', eye: '#fff' },
+  { body: '#aa44ff', fin: '#7700cc', eye: '#fff' },
+];
+
+let state = 'start';
+let score = 0;
+let bestScore = parseInt(localStorage.getItem('fish_best') || '0');
+let lives = 5;
+let frameCount = 0;
+let fish = [];
+let particles = [];
+let bubbles = [];
+let waveT = 0;
+let foodPellets = [];
+
+// Fish emojis for variety
+const FISH_EMOJIS = ['🐠', '🐟', '🐡', '🦈', '🐙'];
+
+function resetGame() {
+  score = 0;
+  lives = 5;
+  frameCount = 0;
+  fish = [];
+  particles = [];
+  foodPellets = [];
+  state = 'playing';
+}
+
+function spawnFish() {
+  const color = FISH_COLORS[Math.floor(Math.random() * FISH_COLORS.length)];
+  const fromRight = Math.random() > 0.5;
+  const speed = (1.2 + score * 0.02) * (fromRight ? -1 : 1);
+  const yLane = H() * 0.15 + Math.random() * H() * 0.65;
+  fish.push({
+    x: fromRight ? W() + 40 : -40,
+    y: yLane,
+    speed,
+    color,
+    r: 22 + Math.random() * 14,
+    wobble: Math.random() * Math.PI * 2,
+    wobbleSpeed: 0.05 + Math.random() * 0.05,
+    fed: false,
+    feedAnim: 0,
+    emoji: FISH_EMOJIS[Math.floor(Math.random() * 3)],
+    id: Math.random()
+  });
+}
+
+function spawnBubble() {
+  bubbles.push({
+    x: Math.random() * W(),
+    y: H() + 10,
+    r: 2 + Math.random() * 5,
+    speed: 0.5 + Math.random() * 1,
+    wobble: Math.random() * Math.PI * 2
+  });
+}
+
+function feedFish(fx, fy) {
+  // Find fish that was clicked/tapped
+  let hit = null;
+  let minDist = Infinity;
+  fish.forEach(f => {
+    if (f.fed) return;
+    const dx = fx - f.x;
+    const dy = fy - f.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < f.r * 1.8 && dist < minDist) {
+      minDist = dist;
+      hit = f;
+    }
+  });
+  if (hit) {
+    hit.fed = true;
+    score++;
+    if (score > bestScore) { bestScore = score; localStorage.setItem('fish_best', bestScore); }
+    // Drop food pellet
+    foodPellets.push({ x: fx, y: fy, vy: 2, life: 1 });
+    // Particles
+    for (let i = 0; i < 12; i++) {
+      particles.push({
+        x: hit.x, y: hit.y,
+        vx: (Math.random()-0.5)*6,
+        vy: (Math.random()-0.5)*6,
+        life: 1,
+        color: hit.color.body
+      });
+    }
+    // Stars
+    for (let i = 0; i < 5; i++) {
+      particles.push({
+        x: hit.x + (Math.random()-0.5)*40,
+        y: hit.y - 20 - Math.random()*20,
+        vx: (Math.random()-0.5)*2,
+        vy: -1 - Math.random(),
+        life: 1,
+        color: '#ffd700',
+        text: '+'
+      });
+    }
+  }
+}
+
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (state === 'start' || state === 'dead') { resetGame(); return; }
+  const rect = canvas.getBoundingClientRect();
+  const sx = W() / rect.width;
+  const sy = H() / rect.height;
+  feedFish((e.clientX - rect.left) * sx, (e.clientY - rect.top) * sy);
+});
+
+function update() {
+  if (state !== 'playing') return;
+  frameCount++;
+  waveT += 0.015;
+
+  // Spawn fish
+  const spawnRate = Math.max(50, 120 - score * 2);
+  if (frameCount % spawnRate === 0) spawnFish();
+
+  // Spawn bubbles
+  if (frameCount % 20 === 0) spawnBubble();
+
+  // Move fish
+  fish.forEach(f => {
+    if (!f.fed) {
+      f.x += f.speed;
+      f.wobble += f.wobbleSpeed;
+    } else {
+      f.feedAnim++;
+      f.y -= 1;
+    }
+  });
+
+  // Remove escaped fish (not fed)
+  const before = fish.length;
+  fish = fish.filter(f => {
+    if (f.fed && f.feedAnim > 60) return false; // fed + floated away
+    if (!f.fed && (f.x > W() + 50 || f.x < -50)) {
+      // Escaped!
+      lives--;
+      if (lives <= 0) {
+        state = 'dead';
+      }
+      return false;
+    }
+    return true;
+  });
+
+  // Bubbles
+  bubbles.forEach(b => {
+    b.y -= b.speed;
+    b.wobble += 0.05;
+    b.x += Math.sin(b.wobble) * 0.4;
+  });
+  bubbles = bubbles.filter(b => b.y > -20 && b.r > 0);
+
+  // Particles
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.1; p.life -= 0.03;
+  });
+  particles = particles.filter(p => p.life > 0);
+
+  // Food pellets
+  foodPellets.forEach(fp => { fp.y += fp.vy; fp.life -= 0.04; });
+  foodPellets = foodPellets.filter(fp => fp.life > 0);
+}
+
+function drawBackground() {
+  const grad = ctx.createLinearGradient(0, 0, 0, H());
+  grad.addColorStop(0, '#001a33');
+  grad.addColorStop(0.5, '#002244');
+  grad.addColorStop(1, '#001122');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W(), H());
+
+  // Caustic light patterns (simple)
+  ctx.strokeStyle = '#00d4ff08';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 8; i++) {
+    ctx.beginPath();
+    const x = (i / 8) * W() + Math.sin(waveT + i) * 20;
+    ctx.moveTo(x, 0);
+    ctx.bezierCurveTo(x + 30, H()*0.3, x - 30, H()*0.6, x, H());
+    ctx.stroke();
+  }
+
+  // Seafloor
+  ctx.fillStyle = '#112233';
+  ctx.beginPath();
+  ctx.moveTo(0, H() * 0.88);
+  for (let x = 0; x <= W(); x += W() / 10) {
+    ctx.lineTo(x, H() * 0.88 + Math.sin(x * 0.03 + waveT) * 8);
+  }
+  ctx.lineTo(W(), H());
+  ctx.lineTo(0, H());
+  ctx.closePath();
+  ctx.fill();
+
+  // Seaweed
+  for (let i = 0; i < 5; i++) {
+    const sx = (i / 5) * W() + 20;
+    ctx.strokeStyle = '#00880044';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(sx, H());
+    for (let y = H(); y > H() * 0.75; y -= 15) {
+      const wave = Math.sin(waveT * 2 + i + y * 0.05) * 8;
+      ctx.lineTo(sx + wave, y);
+    }
+    ctx.stroke();
+  }
+}
+
+function drawBubbles() {
+  bubbles.forEach(b => {
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    ctx.strokeStyle = '#00d4ff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+function drawFish(f) {
+  ctx.save();
+  ctx.translate(f.x, f.y + Math.sin(f.wobble) * 3);
+
+  const r = f.r;
+  const dir = f.speed > 0 ? 1 : -1; // facing direction
+  ctx.scale(dir, 1);
+
+  // Tail
+  ctx.fillStyle = f.color.fin;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.8, 0);
+  ctx.lineTo(-r * 1.6, -r * 0.6);
+  ctx.lineTo(-r * 1.6, r * 0.6);
+  ctx.closePath();
+  ctx.fill();
+
+  // Body
+  ctx.fillStyle = f.color.body;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r, r * 0.55, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Belly stripe
+  ctx.fillStyle = '#ffffff33';
+  ctx.beginPath();
+  ctx.ellipse(r * 0.1, r * 0.1, r * 0.5, r * 0.28, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Dorsal fin
+  ctx.fillStyle = f.color.fin;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.2, -r * 0.5);
+  ctx.lineTo(r * 0.1, -r * 1.0);
+  ctx.lineTo(r * 0.5, -r * 0.5);
+  ctx.closePath();
+  ctx.fill();
+
+  // Eye
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  ctx.arc(r * 0.55, -r * 0.05, r * 0.16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(r * 0.58, -r * 0.08, r * 0.07, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Smile (when fed)
+  if (f.fed) {
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(r * 0.7, r * 0.1, r * 0.2, 0, Math.PI);
+    ctx.stroke();
+    // Heart above
+    ctx.fillStyle = '#ff69b4';
+    ctx.font = `${r * 0.7}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('❤️', 0, -r * 1.3);
+  }
+
+  ctx.restore();
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.save();
+    ctx.globalAlpha = p.life;
+    if (p.text) {
+      ctx.fillStyle = p.color;
+      ctx.font = `bold ${16}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(p.text + '1', p.x, p.y);
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  });
+}
+
+function drawFoodPellets() {
+  foodPellets.forEach(fp => {
+    ctx.save();
+    ctx.globalAlpha = fp.life;
+    ctx.fillStyle = '#ffd700';
+    ctx.beginPath();
+    ctx.arc(fp.x, fp.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawHUD() {
+  // Score
+  ctx.fillStyle = '#ffd700';
+  ctx.font = `bold ${W() * 0.065}px 'Segoe UI', sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(`🐠 ${score}`, 14, 14);
+
+  // Best
+  ctx.fillStyle = '#00d4ff';
+  ctx.font = `${W() * 0.038}px 'Segoe UI', sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.fillText(`BEST: ${bestScore}`, W() - 14, 14);
+
+  // Lives
+  ctx.textAlign = 'left';
+  ctx.font = `${W() * 0.045}px sans-serif`;
+  let hearts = '';
+  for (let i = 0; i < 5; i++) hearts += i < lives ? '❤️' : '🖤';
+  ctx.fillText(hearts, 14, H() * 0.065);
+
+  // Hint
+  ctx.fillStyle = '#ffffff33';
+  ctx.font = `${W() * 0.032}px 'Segoe UI', sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText('TAP fish to feed them before they escape!', W()/2, H() - 8);
+}
+
+function drawScreen(title, sub) {
+  ctx.fillStyle = 'rgba(0,0,0,0.72)';
+  ctx.fillRect(0, 0, W(), H());
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffd700';
+  ctx.font = `bold ${W() * 0.1}px 'Segoe UI', sans-serif`;
+  ctx.fillText(title, W() / 2, H() * 0.32);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `${W() * 0.055}px 'Segoe UI', sans-serif`;
+  ctx.fillText(sub, W() / 2, H() * 0.45);
+  ctx.fillStyle = '#00d4ff';
+  ctx.font = `${W() * 0.045}px 'Segoe UI', sans-serif`;
+  ctx.fillText(`Best: ${bestScore} fish`, W() / 2, H() * 0.56);
+  ctx.fillStyle = '#ffd700';
+  ctx.fillRect(W() * 0.15, H() * 0.65, W() * 0.7, H() * 0.1);
+  ctx.fillStyle = '#0a0a1a';
+  ctx.font = `bold ${W() * 0.055}px 'Segoe UI', sans-serif`;
+  ctx.fillText('▶  TAP TO PLAY', W() / 2, H() * 0.70);
+}
+
+function loop() {
+  ctx.clearRect(0, 0, W(), H());
+  update();
+  drawBackground();
+  drawBubbles();
+  fish.forEach(drawFish);
+  drawFoodPellets();
+  drawParticles();
+  if (state === 'playing') drawHUD();
+  if (state === 'start') drawScreen('🐠 FISH', 'Feed all the fish!');
+  if (state === 'dead') drawScreen('😢 HUNGRY!', `Fed: ${score} fish`);
+  requestAnimationFrame(loop);
+}
+
+// Spawn a few fish to start
+for (let i = 0; i < 3; i++) spawnFish();
+loop();
+</script>
+</body>
+</html>
