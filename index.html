@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>🎮 GEPETO ARCADE</title>
+<title>🎮 ALBERTO'S ARCADE</title>
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -11,15 +11,24 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
+  :root {
+    --cyan: #00d4ff;
+    --gold: #ffd700;
+    --purple: #cc44ff;
+    --dark: #0a0a1e;
+    --card-bg: rgba(20, 20, 50, 0.85);
+  }
+
   body {
-    background: #0a0a1a;
-    color: #ffffff;
+    background: var(--dark);
+    color: #fff;
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
+    touch-action: manipulation;
   }
 
-  /* Stars background */
+  /* Starfield canvas behind everything */
   #stars-canvas {
     position: fixed;
     top: 0; left: 0;
@@ -31,254 +40,644 @@
   .content {
     position: relative;
     z-index: 1;
-    max-width: 600px;
+    max-width: 520px;
     margin: 0 auto;
-    padding: 20px 16px 40px;
+    padding: 0 16px 60px;
   }
 
-  /* Header */
+  /* ── Header ── */
   .header {
     text-align: center;
-    padding: 30px 0 20px;
+    padding: 32px 0 20px;
   }
 
   .header h1 {
-    font-size: clamp(2rem, 8vw, 3.5rem);
+    font-size: clamp(2.1rem, 9vw, 3.8rem);
     font-weight: 900;
     letter-spacing: 2px;
-    color: #00d4ff;
-    text-shadow: 0 0 20px #00d4ff88, 0 0 40px #00d4ff44;
-    animation: pulse-glow 2s ease-in-out infinite;
+    color: var(--cyan);
+    text-shadow:
+      0 0 20px rgba(0,212,255,0.7),
+      0 0 50px rgba(0,212,255,0.3),
+      0 0 80px rgba(0,212,255,0.15);
+    animation: glow-pulse 2.5s ease-in-out infinite;
+    line-height: 1.1;
   }
 
   .header .subtitle {
-    font-size: clamp(0.85rem, 3vw, 1rem);
-    color: #ffd700;
+    font-size: clamp(0.85rem, 3.5vw, 1.1rem);
+    color: rgba(0, 212, 255, 0.5);
     letter-spacing: 4px;
     text-transform: uppercase;
-    margin-top: 8px;
-    opacity: 0.9;
+    margin-top: 6px;
   }
 
-  @keyframes pulse-glow {
-    0%, 100% { text-shadow: 0 0 20px #00d4ff88, 0 0 40px #00d4ff44; }
-    50% { text-shadow: 0 0 30px #00d4ffcc, 0 0 60px #00d4ff66, 0 0 80px #00d4ff33; }
+  @keyframes glow-pulse {
+    0%, 100% { text-shadow: 0 0 20px rgba(0,212,255,0.7), 0 0 50px rgba(0,212,255,0.3); }
+    50% { text-shadow: 0 0 30px rgba(0,212,255,1), 0 0 70px rgba(0,212,255,0.5), 0 0 100px rgba(0,212,255,0.2); }
   }
 
-  /* Game grid */
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    margin: 12px 0 24px;
+    opacity: 0.4;
+  }
+
+  /* ── Game Cards ── */
   .games-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 16px;
-    margin-top: 24px;
-  }
-
-  @media (min-width: 480px) {
-    .games-grid {
-      grid-template-columns: 1fr 1fr;
-    }
-  }
-
-  /* Game card */
-  .game-card {
-    background: linear-gradient(135deg, #0d1b2a 0%, #1a1a3e 100%);
-    border: 1px solid #00d4ff33;
-    border-radius: 20px;
-    padding: 24px 20px;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 10px;
-    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    gap: 14px;
+  }
+
+  .game-card {
+    background: var(--card-bg);
+    border: 1px solid rgba(0, 212, 255, 0.15);
+    border-radius: 18px;
+    padding: 0;
+    overflow: hidden;
+    backdrop-filter: blur(8px);
+    transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     cursor: pointer;
-    text-decoration: none;
-    color: inherit;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
   }
 
   .game-card:hover, .game-card:active {
-    transform: translateY(-4px) scale(1.02);
-    border-color: #00d4ff;
-    box-shadow: 0 8px 30px #00d4ff33;
+    transform: translateY(-3px) scale(1.01);
+    border-color: rgba(0, 212, 255, 0.5);
+    box-shadow: 0 8px 32px rgba(0, 212, 255, 0.2);
   }
 
-  .game-emoji {
-    font-size: 3.5rem;
-    line-height: 1;
-    filter: drop-shadow(0 0 12px #00d4ff66);
+  .card-inner {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    height: 96px;
   }
 
-  .game-name {
-    font-size: 1.1rem;
-    font-weight: 800;
-    color: #ffd700;
+  /* Animated preview panel */
+  .card-preview {
+    width: 96px;
+    height: 96px;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+  }
+
+  .card-preview canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  .card-preview .emoji-preview {
+    font-size: 3rem;
+    z-index: 1;
+    text-shadow: 0 0 20px rgba(255,255,255,0.5);
+    animation: float-emoji 2s ease-in-out infinite;
+  }
+
+  @keyframes float-emoji {
+    0%, 100% { transform: translateY(0) rotate(-5deg); }
+    50% { transform: translateY(-6px) rotate(5deg); }
+  }
+
+  .card-content {
+    flex: 1;
+    padding: 14px 14px 14px 10px;
+    min-width: 0;
+  }
+
+  .card-title {
+    font-size: clamp(1rem, 4vw, 1.2rem);
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-desc {
+    font-size: clamp(0.72rem, 2.8vw, 0.85rem);
+    color: rgba(255,255,255,0.5);
+    margin-top: 3px;
+    line-height: 1.3;
+  }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .card-hs {
+    font-size: clamp(0.72rem, 2.8vw, 0.82rem);
+    color: var(--gold);
+    font-weight: 700;
+  }
+
+  .new-badge {
+    background: linear-gradient(135deg, #ff6600, #ff0088);
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 900;
+    padding: 2px 7px;
+    border-radius: 8px;
     letter-spacing: 1px;
-    text-transform: uppercase;
+    animation: badge-pulse 1.5s ease-in-out infinite;
   }
 
-  .game-desc {
-    font-size: 0.82rem;
-    color: #aabbcc;
-    line-height: 1.4;
-    min-height: 38px;
+  @keyframes badge-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.05); }
+  }
+
+  .card-play {
+    flex-shrink: 0;
+    padding: 0 16px 0 6px;
   }
 
   .play-btn {
-    margin-top: 6px;
-    background: linear-gradient(135deg, #00d4ff, #0090cc);
-    color: #0a0a1a;
-    font-weight: 900;
-    font-size: 1rem;
-    letter-spacing: 3px;
-    text-transform: uppercase;
+    background: linear-gradient(135deg, var(--cyan), #0099ff);
+    color: #fff;
     border: none;
-    border-radius: 50px;
-    padding: 12px 32px;
+    padding: 10px 18px;
+    border-radius: 12px;
+    font-size: clamp(0.8rem, 3vw, 0.95rem);
+    font-weight: 900;
     cursor: pointer;
-    width: 100%;
-    transition: transform 0.15s, box-shadow 0.15s;
-    text-decoration: none;
-    display: block;
-    text-align: center;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 14px rgba(0, 150, 255, 0.4);
+    transition: transform 0.1s, box-shadow 0.1s;
+    -webkit-tap-highlight-color: transparent;
+    white-space: nowrap;
   }
 
-  .play-btn:hover, .play-btn:active {
-    transform: scale(1.05);
-    box-shadow: 0 4px 20px #00d4ff55;
+  .play-btn:active { transform: scale(0.94); box-shadow: 0 2px 8px rgba(0,150,255,0.3); }
+
+  /* Card accent colors per game */
+  .card-wave   { border-left: 3px solid var(--cyan); }
+  .card-jetski { border-left: 3px solid #ff6600; }
+  .card-shark  { border-left: 3px solid #ff4444; }
+  .card-fish   { border-left: 3px solid #44ff88; }
+
+  .card-wave   .play-btn { background: linear-gradient(135deg, var(--cyan), #0066cc); }
+  .card-jetski .play-btn { background: linear-gradient(135deg, #ff6600, #ff2200); }
+  .card-shark  .play-btn { background: linear-gradient(135deg, #ff4444, #cc0000); }
+  .card-fish   .play-btn { background: linear-gradient(135deg, #44ff88, #00cc66); color:#000; }
+
+  /* Scan-line glow stripe on hover */
+  .game-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+    transition: left 0.4s ease;
+    pointer-events: none;
+  }
+  .game-card:hover::after { left: 140%; }
+
+  /* ── Loading Spinner ── */
+  .loading-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: var(--dark);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.5s ease;
   }
 
-  /* Footer */
+  .loading-overlay.hide { opacity: 0; pointer-events: none; }
+
+  .loader-emoji {
+    font-size: 3.5rem;
+    animation: spin-bounce 0.8s ease-in-out infinite;
+  }
+
+  @keyframes spin-bounce {
+    0%, 100% { transform: scale(1) rotate(0deg); }
+    50% { transform: scale(1.2) rotate(180deg); }
+  }
+
+  .loader-text {
+    color: var(--cyan);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    margin-top: 16px;
+    animation: blink 1s step-end infinite;
+  }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ── Footer ── */
   .footer {
     text-align: center;
-    margin-top: 36px;
-    color: #334455;
-    font-size: 0.75rem;
-    letter-spacing: 2px;
+    padding: 30px 0 10px;
+    color: rgba(255,255,255,0.22);
+    font-size: 0.8rem;
+    letter-spacing: 1px;
   }
 
-  .footer span {
-    color: #00d4ff44;
+  /* ── Stats bar ── */
+  .stats-bar {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    padding: 14px 0;
+    margin-bottom: 6px;
   }
 
-  /* Animated star sparkle on title */
-  .sparkle {
-    display: inline-block;
-    animation: spin-sparkle 3s linear infinite;
+  .stat-item {
+    text-align: center;
   }
-  @keyframes spin-sparkle {
-    0% { transform: rotate(0deg) scale(1); }
-    50% { transform: rotate(180deg) scale(1.3); }
-    100% { transform: rotate(360deg) scale(1); }
+
+  .stat-val {
+    font-size: 1.1rem;
+    font-weight: 900;
+    color: var(--gold);
+  }
+
+  .stat-label {
+    font-size: 0.62rem;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 1px;
+    text-transform: uppercase;
   }
 </style>
 </head>
 <body>
 
+<!-- Loading screen -->
+<div class="loading-overlay" id="loader">
+  <div class="loader-emoji">🎮</div>
+  <div class="loader-text">LOADING ARCADE...</div>
+</div>
+
+<!-- Starfield -->
 <canvas id="stars-canvas"></canvas>
 
 <div class="content">
+  <!-- Header -->
   <div class="header">
-    <h1>🎮 GEPETO ARCADE</h1>
-    <div class="subtitle">✨ Choose Your Game ✨</div>
+    <h1>🎮 ALBERTO'S ARCADE</h1>
+    <div class="subtitle">TURBO EDITION · 4 GAMES</div>
   </div>
 
-  <div class="games-grid">
+  <div class="divider"></div>
 
-    <a class="game-card" href="wave.html">
-      <div class="game-emoji">🌊</div>
-      <div class="game-name">Wave Shooter</div>
-      <div class="game-desc">Shoot waves and dodge enemies in this epic action game!</div>
-      <span class="play-btn">▶ PLAY</span>
-    </a>
-
-    <a class="game-card" href="jetski.html">
-      <div class="game-emoji">🏄</div>
-      <div class="game-name">Jetski Racer</div>
-      <div class="game-desc">Race your jetski and dodge rocks & waves. How long can you survive?</div>
-      <span class="play-btn">▶ PLAY</span>
-    </a>
-
-    <a class="game-card" href="shark.html">
-      <div class="game-emoji">🦈</div>
-      <div class="game-name">Shark Dodge</div>
-      <div class="game-desc">Sharks are coming from all sides! Teleport to safety — dodge them all!</div>
-      <span class="play-btn">▶ PLAY</span>
-    </a>
-
-    <a class="game-card" href="fish.html">
-      <div class="game-emoji">🐠</div>
-      <div class="game-name">Fish Feeder</div>
-      <div class="game-desc">Tap fish before they escape! Feed them all to keep the ocean happy.</div>
-      <span class="play-btn">▶ PLAY</span>
-    </a>
-
-    <a class="game-card" href="jetski2.html" style="border-color:#aa44ff55;">
-      <div class="game-emoji" style="filter:drop-shadow(0 0 14px #aa44ff88);">🏄</div>
-      <div class="game-name" style="color:#cc88ff;">Jetski ULTRA</div>
-      <div class="game-desc">3-lane dodging, double-jump, boost meter, coin combos & zone-based difficulty. AI Studio Edition!</div>
-      <span class="play-btn" style="background:linear-gradient(135deg,#aa44ff,#6600cc);">▶ PLAY</span>
-    </a>
-
+  <!-- Stats -->
+  <div class="stats-bar" id="stats-bar">
+    <div class="stat-item">
+      <div class="stat-val" id="stat-games">4</div>
+      <div class="stat-label">Games</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val" id="stat-hs">0</div>
+      <div class="stat-label">Best Score</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val" id="stat-plays">0</div>
+      <div class="stat-label">Plays</div>
+    </div>
   </div>
+
+  <!-- Game Cards -->
+  <div class="games-grid" id="games-grid">
+
+    <div class="game-card card-wave" onclick="playGame('wave.html')" id="card-wave">
+      <div class="card-inner">
+        <div class="card-preview" style="background:linear-gradient(135deg,#0a0a2e,#001a3e)">
+          <canvas id="preview-wave" width="96" height="96"></canvas>
+          <span class="emoji-preview">🚀</span>
+        </div>
+        <div class="card-content">
+          <div class="card-title">Wave Shooter</div>
+          <div class="card-desc">Turbo space shooter · Waves of enemies</div>
+          <div class="card-meta">
+            <span class="card-hs" id="hs-wave">🏆 —</span>
+            <span class="new-badge">NEW</span>
+          </div>
+        </div>
+        <div class="card-play">
+          <button class="play-btn">PLAY</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-card card-jetski" onclick="playGame('jetski.html')" id="card-jetski">
+      <div class="card-inner">
+        <div class="card-preview" style="background:linear-gradient(135deg,#001133,#002244)">
+          <canvas id="preview-jetski" width="96" height="96"></canvas>
+          <span class="emoji-preview" style="animation-delay:0.4s">🏄</span>
+        </div>
+        <div class="card-content">
+          <div class="card-title">Jetski TURBO Race</div>
+          <div class="card-desc">Endless ocean racer · Turbo boost!</div>
+          <div class="card-meta">
+            <span class="card-hs" id="hs-jetski">🏆 —</span>
+            <span class="new-badge">NEW</span>
+          </div>
+        </div>
+        <div class="card-play">
+          <button class="play-btn">PLAY</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-card card-shark" onclick="playGame('shark.html')" id="card-shark">
+      <div class="card-inner">
+        <div class="card-preview" style="background:linear-gradient(135deg,#001a2e,#002233)">
+          <canvas id="preview-shark" width="96" height="96"></canvas>
+          <span class="emoji-preview" style="animation-delay:0.8s">🦈</span>
+        </div>
+        <div class="card-content">
+          <div class="card-title">Shark Attack!</div>
+          <div class="card-desc">Survive the ocean · Swim or die!</div>
+          <div class="card-meta">
+            <span class="card-hs" id="hs-shark">🏆 —</span>
+            <span class="new-badge">NEW</span>
+          </div>
+        </div>
+        <div class="card-play">
+          <button class="play-btn">PLAY</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-card card-fish" onclick="playGame('fish.html')" id="card-fish">
+      <div class="card-inner">
+        <div class="card-preview" style="background:linear-gradient(135deg,#001a33,#002244)">
+          <canvas id="preview-fish" width="96" height="96"></canvas>
+          <span class="emoji-preview" style="animation-delay:1.2s">🐟</span>
+        </div>
+        <div class="card-content">
+          <div class="card-title">Fish Frenzy!</div>
+          <div class="card-desc">Eat · Grow · Dominate the ocean</div>
+          <div class="card-meta">
+            <span class="card-hs" id="hs-fish">🏆 —</span>
+            <span class="new-badge">NEW</span>
+          </div>
+        </div>
+        <div class="card-play">
+          <button class="play-btn">PLAY</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end grid -->
+
+  <div class="divider" style="margin-top:30px"></div>
 
   <div class="footer">
-    <span>★</span> GEPETO ARCADE <span>★</span> games.mrgepeto.ai <span>★</span>
+    Built with ❤️ by AI &nbsp;·&nbsp; Phaser.js &nbsp;·&nbsp; games.mrgepeto.ai
   </div>
-</div>
+</div><!-- end content -->
 
 <script>
-// Animated starfield background
-const canvas = document.getElementById('stars-canvas');
-const ctx = canvas.getContext('2d');
+// ─── Starfield ───────────────────────────────────────────────
+(function() {
+  const canvas = document.getElementById('stars-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, stars = [];
 
-let stars = [];
-let W, H;
-
-function resize() {
-  W = canvas.width = window.innerWidth;
-  H = canvas.height = window.innerHeight;
-}
-
-function initStars() {
-  stars = [];
-  for (let i = 0; i < 160; i++) {
-    stars.push({
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    stars = Array.from({length: 180}, () => ({
       x: Math.random() * W,
       y: Math.random() * H,
-      r: Math.random() * 1.5 + 0.3,
-      speed: Math.random() * 0.3 + 0.05,
-      twinkle: Math.random() * Math.PI * 2,
-      twinkleSpeed: Math.random() * 0.04 + 0.01,
-      color: Math.random() > 0.85 ? '#ffd700' : '#00d4ff'
-    });
+      r: Math.random() * 1.8 + 0.2,
+      sp: Math.random() * 0.5 + 0.1,
+      a: Math.random() * 0.7 + 0.2
+    }));
   }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    // Deep space gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#0a0a1e');
+    grad.addColorStop(0.5, '#050514');
+    grad.addColorStop(1, '#000a1a');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    // Nebula hints
+    const neb = ctx.createRadialGradient(W*0.3, H*0.4, 0, W*0.3, H*0.4, W*0.35);
+    neb.addColorStop(0, 'rgba(0,50,100,0.12)');
+    neb.addColorStop(1, 'transparent');
+    ctx.fillStyle = neb;
+    ctx.fillRect(0, 0, W, H);
+    const neb2 = ctx.createRadialGradient(W*0.75, H*0.7, 0, W*0.75, H*0.7, W*0.3);
+    neb2.addColorStop(0, 'rgba(80,0,120,0.09)');
+    neb2.addColorStop(1, 'transparent');
+    ctx.fillStyle = neb2;
+    ctx.fillRect(0, 0, W, H);
+    // Stars
+    stars.forEach(s => {
+      s.y += s.sp * 0.3;
+      if (s.y > H) { s.y = 0; s.x = Math.random() * W; }
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${s.a})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  draw();
+})();
+
+// ─── Card Preview Animations ─────────────────────────────────
+function animatePreview(id, drawFn) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let t = 0;
+  function loop() {
+    t += 0.02;
+    ctx.clearRect(0, 0, 96, 96);
+    drawFn(ctx, t, 96, 96);
+    requestAnimationFrame(loop);
+  }
+  loop();
 }
 
-function drawStars() {
-  ctx.clearRect(0, 0, W, H);
-  const now = Date.now() * 0.001;
-  stars.forEach(s => {
-    s.twinkle += s.twinkleSpeed;
-    const alpha = 0.3 + 0.5 * Math.abs(Math.sin(s.twinkle));
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-    ctx.fillStyle = s.color.replace(')', `, ${alpha})`).replace('rgb', 'rgba').replace('#ffd700', `rgba(255,215,0,${alpha})`).replace('#00d4ff', `rgba(0,212,255,${alpha})`);
-    ctx.fill();
-    // slowly drift downward
-    s.y += s.speed;
-    if (s.y > H + 2) {
-      s.y = -2;
-      s.x = Math.random() * W;
+// Wave preview: scrolling stars + tiny ship
+animatePreview('preview-wave', (ctx, t, W, H) => {
+  for (let i = 0; i < 15; i++) {
+    const y = ((i * 17 + t * 30) % H);
+    const x = (i * 31) % W;
+    ctx.fillStyle = `rgba(255,255,255,${0.3 + 0.4*(i%3)/3})`;
+    ctx.fillRect(x, y, 1.5, 1.5);
+  }
+  // Ship
+  const sy = H * 0.55 + Math.sin(t * 2) * 4;
+  ctx.fillStyle = '#00d4ff';
+  ctx.beginPath(); ctx.moveTo(48, sy-14); ctx.lineTo(40, sy+10); ctx.lineTo(56, sy+10); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#ffd700';
+  ctx.beginPath(); ctx.moveTo(48, sy-6); ctx.lineTo(44, sy+6); ctx.lineTo(52, sy+6); ctx.closePath(); ctx.fill();
+  // Exhaust
+  ctx.fillStyle = `rgba(255,102,0,${0.5+0.5*Math.sin(t*10)})`;
+  ctx.beginPath(); ctx.arc(44, sy+12, 3, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(52, sy+12, 3, 0, Math.PI*2); ctx.fill();
+});
+
+// Jetski preview: water lanes + jetski
+animatePreview('preview-jetski', (ctx, t, W, H) => {
+  // Water
+  for (let y = 0; y < H; y += 14) {
+    const d = y / H;
+    ctx.fillStyle = `rgba(0,${Math.floor(40+80*d)},${Math.floor(100+100*d)},1)`;
+    ctx.fillRect(0, y, W, 14);
+  }
+  // Wave lines
+  for (let i = 0; i < 4; i++) {
+    const wy = (i * 28 + t * 40) % H;
+    ctx.strokeStyle = 'rgba(0,136,255,0.2)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, wy); ctx.bezierCurveTo(W*0.3, wy-4, W*0.7, wy+4, W, wy); ctx.stroke();
+  }
+  // Jetski
+  const jy = H * 0.5 + Math.sin(t * 3) * 5;
+  ctx.fillStyle = '#00d4ff';
+  ctx.beginPath(); ctx.ellipse(48, jy, 22, 8, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#ffd700';
+  ctx.beginPath(); ctx.ellipse(48, jy-5, 12, 5, 0, 0, Math.PI*2); ctx.fill();
+  if (Math.sin(t * 8) > 0) {
+    ctx.fillStyle = 'rgba(255,102,0,0.7)';
+    ctx.beginPath(); ctx.moveTo(26, jy+5); ctx.lineTo(20, jy+10); ctx.lineTo(22, jy+3); ctx.closePath(); ctx.fill();
+  }
+  // Splash
+  ctx.fillStyle = 'rgba(0,200,255,0.5)';
+  for (let i = 0; i < 3; i++) ctx.fillRect(26+i*4, jy+4, 2, 2+Math.sin(t*5+i)*2);
+});
+
+// Shark preview: swimming shark
+animatePreview('preview-shark', (ctx, t, W, H) => {
+  // Deep water
+  for (let y = 0; y < H; y += 16) {
+    const d = y/H;
+    ctx.fillStyle = `rgba(0,${Math.floor(20+60*d)},${Math.floor(40+100*d)},1)`;
+    ctx.fillRect(0, y, W, 16);
+  }
+  // Diver (center)
+  const dy = H*0.45+Math.sin(t*1.5)*5;
+  ctx.fillStyle = '#0088ff';
+  ctx.beginPath(); ctx.ellipse(48, dy, 8, 14, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#ffcc88'; ctx.beginPath(); ctx.arc(48, dy-16, 6, 0, Math.PI*2); ctx.fill();
+  // Shark circling
+  const sx = 48 + Math.cos(t * 1.2) * 32;
+  const sy2 = H*0.5 + Math.sin(t * 1.2) * 20;
+  ctx.save(); ctx.translate(sx, sy2);
+  ctx.rotate(Math.atan2(Math.sin(t*1.2)*20, -Math.sin(t*1.2+Math.PI/2)*32));
+  ctx.fillStyle = '#7799bb';
+  ctx.beginPath(); ctx.ellipse(0, 0, 20, 7, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#fefefe'; ctx.beginPath(); ctx.ellipse(0, 3, 14, 4, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#556688';
+  ctx.beginPath(); ctx.moveTo(14, -8); ctx.lineTo(20, -8); ctx.lineTo(14, 0); ctx.closePath(); ctx.fill();
+  ctx.restore();
+});
+
+// Fish preview: colorful fish swimming
+animatePreview('preview-fish', (ctx, t, W, H) => {
+  for (let y = 0; y < H; y += 16) {
+    const d = y/H;
+    ctx.fillStyle = `rgba(0,${Math.floor(26+50*d)},${Math.floor(51+100*d)},1)`;
+    ctx.fillRect(0, y, W, 16);
+  }
+  // Bubbles
+  for (let i = 0; i < 6; i++) {
+    const bx = (i*17+20)%W, by = ((i*23 + t*25) % H);
+    ctx.strokeStyle = 'rgba(136,221,255,0.3)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(bx, by, 2+i%3, 0, Math.PI*2); ctx.stroke();
+  }
+  // Fish swarm
+  const fishDefs = [
+    {col:'#ff6644',x:20,y:30,phase:0},{col:'#ffcc00',x:70,y:55,phase:1.2},
+    {col:'#44aaff',x:40,y:72,phase:2.4},{col:'#ff44aa',x:78,y:28,phase:0.7},
+    {col:'#44ffaa',x:55,y:40,phase:1.8}
+  ];
+  fishDefs.forEach(f => {
+    const fx = f.x + Math.sin(t*1.3+f.phase)*12;
+    const fy = f.y + Math.sin(t*0.9+f.phase*1.5)*8;
+    const flip = Math.sin(t*0.4+f.phase) > 0;
+    ctx.save(); ctx.translate(fx, fy); if (flip) ctx.scale(-1,1);
+    ctx.fillStyle = f.col;
+    ctx.beginPath(); ctx.ellipse(0, 0, 10, 6, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(8, -5); ctx.lineTo(13, 0); ctx.lineTo(8, 5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(-5, -1, 2, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  });
+  // Player fish (bigger)
+  const px = 48+Math.sin(t*1.8)*18, py = 48+Math.cos(t*1.3)*14;
+  ctx.fillStyle = '#00d4ff';
+  ctx.beginPath(); ctx.ellipse(px, py, 16, 10, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#0088aa';
+  ctx.beginPath(); ctx.moveTo(px+14, py-8); ctx.lineTo(px+20, py); ctx.lineTo(px+14, py+8); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(px-8, py-2, 3, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px-8, py-2, 1.5, 0, Math.PI*2); ctx.fill();
+});
+
+// ─── High Scores ─────────────────────────────────────────────
+function loadScores() {
+  const maps = {
+    'hs-wave': {key:'ws_hs', fmt: v => v > 0 ? `🏆 ${v}` : '🏆 —'},
+    'hs-jetski': {key:'js_hs', fmt: v => v > 0 ? `🏆 ${v}m` : '🏆 —'},
+    'hs-shark': {key:'sa_hs', fmt: v => v > 0 ? `🏆 ${v}s` : '🏆 —'},
+    'hs-fish': {key:'ff_hs', fmt: v => v > 0 ? `🏆 ${v}` : '🏆 —'},
+  };
+  let totalBest = 0;
+  let totalPlays = parseInt(localStorage.getItem('arcade_plays') || '0');
+  Object.entries(maps).forEach(([elId, {key, fmt}]) => {
+    const el = document.getElementById(elId);
+    if (el) {
+      const v = parseInt(localStorage.getItem(key) || '0');
+      el.textContent = fmt(v);
+      totalBest = Math.max(totalBest, v);
     }
   });
-  requestAnimationFrame(drawStars);
+  const statHs = document.getElementById('stat-hs');
+  if (statHs) statHs.textContent = totalBest > 0 ? totalBest : '—';
+  const statPlays = document.getElementById('stat-plays');
+  if (statPlays) statPlays.textContent = totalPlays;
 }
 
-resize();
-initStars();
-drawStars();
-window.addEventListener('resize', () => { resize(); initStars(); });
+function playGame(url) {
+  let plays = parseInt(localStorage.getItem('arcade_plays') || '0');
+  localStorage.setItem('arcade_plays', plays + 1);
+  // Fade transition
+  document.body.style.opacity = '0';
+  document.body.style.transition = 'opacity 0.25s ease';
+  setTimeout(() => { window.location.href = url; }, 250);
+}
+
+// ─── Init ─────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  loadScores();
+  // Hide loader
+  const loader = document.getElementById('loader');
+  setTimeout(() => { loader.classList.add('hide'); setTimeout(() => loader.remove(), 600); }, 800);
+});
+
+// Refresh scores on focus (coming back from game)
+window.addEventListener('focus', loadScores);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) loadScores(); });
 </script>
 </body>
 </html>
-

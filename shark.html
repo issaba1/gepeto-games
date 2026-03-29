@@ -3,394 +3,382 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>🦈 Shark Dodge</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: #0a0a1a;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    overflow: hidden;
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    touch-action: none;
-    user-select: none;
-  }
-  canvas {
-    display: block;
-    max-width: 100vw;
-    max-height: 100vh;
-    border: 2px solid #00d4ff44;
-    border-radius: 12px;
-  }
-  #back-btn {
-    position: fixed;
-    top: 12px; left: 12px;
-    background: #00d4ff22;
-    border: 1px solid #00d4ff55;
-    color: #00d4ff;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    z-index: 100;
-    text-decoration: none;
-    font-weight: 700;
-  }
-</style>
+<title>🦈 Shark Attack!</title>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+<style>* { margin:0; padding:0; box-sizing:border-box; } body { background:#000; overflow:hidden; touch-action:none; -webkit-user-select:none; user-select:none; } canvas { display:block; margin:0 auto; }</style>
 </head>
 <body>
-<a href="index.html" id="back-btn">← LOBBY</a>
-<canvas id="c"></canvas>
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
+// SHARK ATTACK! — Phaser 3
+// CCGS MDA: Mechanics=swim-away/dash/power-ups | Dynamics=proximity danger, depth risk/reward | Aesthetics=tension + relief
+// Player Fantasy: brave diver vs ocean of sharks — pulse-pounding survival
+// Flow State: slow shark intro → swarms → panic TURBO DASH moments
 
-function resize() {
-  const s = Math.min(window.innerWidth, window.innerHeight - 20, 500);
-  canvas.width = s;
-  canvas.height = s;
-}
-resize();
-window.addEventListener('resize', resize);
+const GW = Math.min(window.innerWidth, 480);
+const GH = window.innerHeight;
 
-const W = () => canvas.width;
-const H = () => canvas.height;
-
-let state = 'start';
-let score = 0;
-let bestScore = parseInt(localStorage.getItem('shark_best') || '0');
-let frameCount = 0;
-let sharks = [];
-let particles = [];
-let player = { x: 0, y: 0, r: 14, teleportCooldown: 0 };
-let ripples = [];
-let waveT = 0;
-
-function resetGame() {
-  score = 0;
-  frameCount = 0;
-  sharks = [];
-  particles = [];
-  ripples = [];
-  player.x = W() / 2;
-  player.y = H() / 2;
-  player.teleportCooldown = 0;
-  state = 'playing';
-}
-
-function spawnShark() {
-  // Pick a random edge
-  const edge = Math.floor(Math.random() * 4);
-  let x, y, angle;
-  if (edge === 0) { x = Math.random() * W(); y = -30; angle = Math.PI / 2 + (Math.random() - 0.5) * 1; }
-  else if (edge === 1) { x = W() + 30; y = Math.random() * H(); angle = Math.PI + (Math.random() - 0.5) * 1; }
-  else if (edge === 2) { x = Math.random() * W(); y = H() + 30; angle = -Math.PI / 2 + (Math.random() - 0.5) * 1; }
-  else { x = -30; y = Math.random() * H(); angle = (Math.random() - 0.5) * 1; }
-
-  // Target player
-  const dx = player.x - x;
-  const dy = player.y - y;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  const baseSpeed = 1.2 + score * 0.08;
-  sharks.push({
-    x, y,
-    vx: (dx / dist) * baseSpeed,
-    vy: (dy / dist) * baseSpeed,
-    angle: Math.atan2(dy, dx),
-    r: 18,
-    wobble: Math.random() * Math.PI * 2,
-    scored: false
-  });
-}
-
-function teleport(tx, ty) {
-  if (player.teleportCooldown > 0) return;
-  // Make sure not too close to a shark
-  const safe = sharks.every(s => {
-    const dx = tx - s.x;
-    const dy = ty - s.y;
-    return Math.sqrt(dx * dx + dy * dy) > 60;
-  });
-  // Ripple at old pos
-  ripples.push({ x: player.x, y: player.y, r: 0, maxR: 40, life: 1 });
-  player.x = tx;
-  player.y = ty;
-  player.teleportCooldown = 12;
-  // Ripple at new pos
-  ripples.push({ x: tx, y: ty, r: 0, maxR: 40, life: 1 });
-  // particles
-  for (let i = 0; i < 10; i++) {
-    particles.push({ x: tx, y: ty, vx: (Math.random()-0.5)*5, vy: (Math.random()-0.5)*5, life: 1, color: '#00d4ff' });
+class BootScene extends Phaser.Scene {
+  constructor() { super('BootScene'); }
+  create() {
+    const g = this.make.graphics({x:0,y:0,add:false});
+    // Diver
+    g.clear();
+    g.fillStyle(0x0088ff,1); g.fillEllipse(20,16,24,36); // body
+    g.fillStyle(0xffcc88,1); g.fillCircle(20,6,8); // head
+    g.fillStyle(0x0066cc,1); g.fillRect(8,28,24,8); // fins belt
+    g.fillStyle(0x00ccff,1); g.fillEllipse(20,28,8,20); // legs
+    g.fillStyle(0xffcc88,1); g.fillRect(6,14,6,10); g.fillRect(28,14,6,10); // arms
+    g.fillStyle(0x00aaff,0.8); g.fillEllipse(20,4,14,12); // mask
+    g.generateTexture('diver',40,40);
+    // Shark
+    g.clear();
+    g.fillStyle(0x7799bb,1); g.fillEllipse(36,14,72,24); // body
+    g.fillStyle(0x8899cc,1); g.fillEllipse(36,12,48,16); // lighter top
+    g.fillStyle(0xffffff,1); g.fillEllipse(36,20,36,10); // white belly
+    g.fillStyle(0x7799bb,1); g.fillTriangle(60,4,72,4,60,16); // dorsal fin top
+    g.fillTriangle(60,16,72,28,48,22); // tail
+    g.fillStyle(0x222233,1); g.fillCircle(12,12,3); // eye
+    g.fillStyle(0xffffff,1); g.fillCircle(12,12,1.5);
+    g.generateTexture('shark',72,28);
+    // Big shark
+    g.clear();
+    g.fillStyle(0x556688,1); g.fillEllipse(44,18,88,30);
+    g.fillStyle(0x6677aa,1); g.fillEllipse(44,14,60,20);
+    g.fillStyle(0xffffff,1); g.fillEllipse(44,24,44,14);
+    g.fillStyle(0x556688,1); g.fillTriangle(74,4,88,4,74,18); g.fillTriangle(74,18,88,34,58,26);
+    g.fillStyle(0x111122,1); g.fillCircle(14,14,4); g.fillStyle(0xffffff,1); g.fillCircle(14,14,2);
+    g.generateTexture('bshark',88,36);
+    // Power-ups
+    g.clear(); g.fillStyle(0x00ffaa,0.9); g.fillCircle(16,16,14); g.fillStyle(0x00cc88,1); g.fillCircle(16,16,9);
+    g.fillStyle(0xffffff,1); g.fillRect(13,5,3,22); g.fillRect(5,13,22,3);
+    g.generateTexture('pu_repel',32,32);
+    g.clear(); g.fillStyle(0x00ccff,0.9); g.fillCircle(16,16,14); g.fillStyle(0x0088ff,1); g.fillCircle(16,16,9);
+    g.fillStyle(0xffffff,1); g.fillTriangle(16,4,8,24,24,24);
+    g.generateTexture('pu_fins',32,32);
+    g.clear(); g.fillStyle(0xffcc00,0.9); g.fillCircle(16,16,14); g.fillStyle(0xddaa00,1); g.fillCircle(16,16,9);
+    for(let i=0;i<6;i++){const a=i*60*Math.PI/180;g.fillStyle(0xffffff,1);g.fillCircle(16+Math.cos(a)*7,16+Math.sin(a)*7,2.5);}
+    g.generateTexture('pu_bubble',32,32);
+    // Coin
+    g.clear(); g.fillStyle(0xffd700,1); g.fillCircle(10,10,10); g.fillStyle(0xffaa00,1); g.fillCircle(10,10,7); g.fillStyle(0xffd700,1); g.fillRect(8,5,4,10);
+    g.generateTexture('coin',20,20);
+    // Particle
+    g.clear(); g.fillStyle(0xffffff,1); g.fillCircle(3,3,3);
+    g.generateTexture('particle',6,6);
+    g.destroy();
+    this.scene.start('MenuScene');
   }
 }
 
-canvas.addEventListener('pointerdown', e => {
-  e.preventDefault();
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = W() / rect.width;
-  const scaleY = H() / rect.height;
-  const tx = (e.clientX - rect.left) * scaleX;
-  const ty = (e.clientY - rect.top) * scaleY;
-  if (state === 'start' || state === 'dead') { resetGame(); return; }
-  teleport(tx, ty);
+class MenuScene extends Phaser.Scene {
+  constructor() { super('MenuScene'); }
+  create() {
+    const W=this.scale.width,H=this.scale.height;
+    this.cameras.main.setBackgroundColor('#001a2e');
+    this.bgGfx=this.add.graphics();this.t=0;
+    const fs=n=>Math.floor(W*n);
+    this.add.text(W/2,H*0.1,'🦈 SHARK ATTACK!',{fontSize:`${fs(0.08)}px`,fontFamily:'Arial Black,sans-serif',color:'#ff4444',stroke:'#000',strokeThickness:5}).setOrigin(0.5);
+    this.add.text(W/2,H*0.22,'Survive the deep!',{fontSize:`${fs(0.048)}px`,fontFamily:'Arial Black,sans-serif',color:'#00d4ff',stroke:'#001133',strokeThickness:3}).setOrigin(0.5);
+    const hs=localStorage.getItem('sa_hs')||0;
+    this.add.text(W/2,H*0.32,`🏆 BEST: ${hs}s`,{fontSize:`${fs(0.042)}px`,fontFamily:'Arial,sans-serif',color:'#ffdd88'}).setOrigin(0.5);
+    const btn=this.add.text(W/2,H*0.65,' ▶ DIVE IN! ',{fontSize:`${fs(0.075)}px`,fontFamily:'Arial Black,sans-serif',color:'#ffffff',backgroundColor:'#ff444433',padding:{x:24,y:14},stroke:'#ff4444',strokeThickness:2}).setOrigin(0.5).setInteractive({useHandCursor:true});
+    btn.on('pointerdown',()=>{this.cameras.main.flash(200,255,0,0);this.time.delayedCall(200,()=>this.scene.start('GameScene'));});
+    this.tweens.add({targets:btn,scaleX:1.06,scaleY:1.06,yoyo:true,repeat:-1,duration:650,ease:'Sine.InOut'});
+    this.add.text(W/2,H*0.79,'TAP to swim  •  DOUBLE TAP = DASH 💨\nAvoid sharks from ALL sides!',{fontSize:`${fs(0.033)}px`,fontFamily:'Arial,sans-serif',color:'#6688aa',align:'center',lineSpacing:4}).setOrigin(0.5);
+    this.add.text(W/2,H*0.92,'🛡 Repellent  •  🐠 Speed Fins  •  💛 Bubble Shield',{fontSize:`${fs(0.031)}px`,fontFamily:'Arial,sans-serif',color:'#445566',align:'center'}).setOrigin(0.5);
+  }
+  update(t,dt) {
+    this.t+=dt/1000;const W=this.scale.width,H=this.scale.height;
+    this.bgGfx.clear();
+    for(let y=0;y<H;y+=24){const d=y/H;this.bgGfx.fillStyle(Phaser.Display.Color.GetColor(0,Math.floor(26+40*d),Math.floor(46+80*d)),1);this.bgGfx.fillRect(0,y,W,24);}
+    // Animated shark silhouette
+    const sx=((W*0.6)+Math.sin(this.t*0.7)*W*0.3+W)%(W+100)-50;
+    this.bgGfx.fillStyle(0x334455,0.4);this.bgGfx.fillEllipse(sx,H*0.5,88,32);
+    this.bgGfx.fillTriangle(sx+34,H*0.5-12,sx+44,H*0.5-12,sx+34,H*0.5+4);
+  }
+}
+
+class GameScene extends Phaser.Scene {
+  constructor() { super('GameScene'); }
+  create() {
+    const W=this.scale.width,H=this.scale.height;
+    this.W=W;this.H=H;
+    this.score=0;this.coins=0;this.lives=3;this.gameTime=0;this.gameOver=false;
+    this.invincible=false;this.invincibleTimer=0;
+    this.repelActive=false;this.repelTimer=0;
+    this.speedBoost=false;this.speedTimer=0;
+    this.bubbleActive=false;this.bubbleTimer=0;
+    this.dashTimer=0;this.lastTapTime=0;this.dashVX=0;this.dashVY=0;this.dashDur=0;
+    this.depth=0;this.sharkSpawnRate=2.5;this.diffTimer=0;
+    this.bgGfx=this.add.graphics().setDepth(0);this.waterGfx=this.add.graphics().setDepth(1);
+    this.bubbleGfx=this.add.graphics().setDepth(2);this.waterT=0;
+    // Bubbles array
+    this.bubbles=Array.from({length:25},()=>({x:Phaser.Math.Between(0,W),y:Phaser.Math.Between(0,H),r:Phaser.Math.FloatBetween(2,7),sp:Phaser.Math.FloatBetween(0.3,1.2)}));
+    // Groups
+    this.sharks=this.physics.add.group();
+    this.coinGroup=this.physics.add.group();
+    this.puGroup=this.physics.add.group();
+    // Particles
+    this.splash=this.add.particles(0,0,'particle',{speed:{min:50,max:180},scale:{start:0.5,end:0},alpha:{start:0.8,end:0},lifespan:{min:200,max:500},quantity:1,emitting:false,tint:[0x00aaff,0x0066ff,0xffffff,0x88ddff]}).setDepth(12);
+    this.bloodSplat=this.add.particles(0,0,'particle',{speed:{min:40,max:100},scale:{start:0.6,end:0},alpha:{start:0.9,end:0},lifespan:{min:300,max:600},quantity:1,emitting:false,tint:[0xff0000,0xdd2222,0xff4444]}).setDepth(12);
+    // Player
+    this.player=this.physics.add.sprite(W/2,H/2,'diver').setDepth(10).setScale(1.1);
+    this.player.setCollideWorldBounds(true);this.player.body.setGravityY(0);
+    this.shieldGfx=this.add.graphics().setDepth(11);
+    this.repelGfx=this.add.graphics().setDepth(11);
+    // UI
+    const fs=n=>Math.floor(W*n);
+    this.timeTxt=this.add.text(10,10,'0s',{fontSize:`${fs(0.05)}px`,fontFamily:'Arial Black,sans-serif',color:'#00d4ff'}).setDepth(40);
+    this.scoreTxt=this.add.text(W/2,10,'',{fontSize:`${fs(0.04)}px`,fontFamily:'Arial,sans-serif',color:'#ffd700'}).setOrigin(0.5,0).setDepth(40);
+    this.heartsTxt=this.add.text(W-10,10,'❤️❤️❤️',{fontSize:`${fs(0.042)}px`}).setOrigin(1,0).setDepth(40);
+    this.depthTxt=this.add.text(10,H-36,'Depth: 0m',{fontSize:`${fs(0.036)}px`,fontFamily:'Arial,sans-serif',color:'#88aacc'}).setDepth(40);
+    this.puTxt=this.add.text(W/2,H-36,'',{fontSize:`${fs(0.035)}px`,fontFamily:'Arial,sans-serif',color:'#00ffcc'}).setOrigin(0.5,1).setDepth(40);
+    this.dashHintTxt=this.add.text(W*0.85,H*0.88,'DOUBLE\nTAP\nDASH',{fontSize:`${fs(0.032)}px`,fontFamily:'Arial Black,sans-serif',color:'#00ddff',align:'center'}).setOrigin(0.5).setDepth(41).setAlpha(0.4);
+    // Input
+    this.cursors=this.input.keyboard.createCursorKeys();
+    this.wasd=this.input.keyboard.addKeys({up:Phaser.Input.Keyboard.KeyCodes.W,down:Phaser.Input.Keyboard.KeyCodes.S,left:Phaser.Input.Keyboard.KeyCodes.A,right:Phaser.Input.Keyboard.KeyCodes.D});
+    this.input.on('pointerdown',this.onTap,this);
+    this.tapTarget={x:W/2,y:H/2};this.usingTouch=false;
+    // Overlaps
+    this.physics.add.overlap(this.player,this.sharks,this.hitShark,null,this);
+    this.physics.add.overlap(this.player,this.coinGroup,this.hitCoin,null,this);
+    this.physics.add.overlap(this.player,this.puGroup,this.hitPowerup,null,this);
+    // Spawn
+    this.sharkTimer=0;this.coinTimer=0;this.puTimer=0;
+  }
+
+  onTap(p) {
+    if(this.gameOver)return;
+    const now=this.time.now;
+    if(now-this.lastTapTime<300){this.triggerDash(p.x,p.y);}
+    this.lastTapTime=now;
+    this.tapTarget={x:p.x,y:p.y};this.usingTouch=true;
+  }
+
+  triggerDash(tx,ty) {
+    const dx=tx-this.player.x,dy=ty-this.player.y,dist=Math.sqrt(dx*dx+dy*dy)+0.01;
+    const spd=600;
+    this.dashVX=(dx/dist)*spd;this.dashVY=(dy/dist)*spd;this.dashDur=0.25;
+    this.cameras.main.shake(200,0.015);
+    this.splash.setPosition(this.player.x,this.player.y);this.splash.explode(8);
+  }
+
+  update(t,delta) {
+    if(this.gameOver)return;
+    const dt=delta/1000;
+    this.gameTime+=dt;this.depth=Math.floor(this.gameTime*3);
+    this.waterT+=dt;
+    // Difficulty
+    this.diffTimer+=dt;
+    if(this.diffTimer>10){this.diffTimer=0;this.sharkSpawnRate=Math.max(0.4,this.sharkSpawnRate-0.2);}
+    // Timers
+    if(this.invincibleTimer>0){this.invincibleTimer-=dt;if(this.invincibleTimer<=0){this.invincible=false;this.player.setAlpha(1);}}
+    if(this.repelTimer>0){this.repelTimer-=dt;if(this.repelTimer<=0)this.repelActive=false;}
+    if(this.speedTimer>0){this.speedTimer-=dt;if(this.speedTimer<=0)this.speedBoost=false;}
+    if(this.bubbleTimer>0){this.bubbleTimer-=dt;if(this.bubbleTimer<=0)this.bubbleActive=false;}
+    if(this.dashDur>0){this.dashDur-=dt;this.player.body.setVelocity(this.dashVX,this.dashVY);this.splash.setPosition(this.player.x,this.player.y);this.splash.explode(2);}
+    else {this.handleMovement(dt);}
+    // Spawn
+    this.sharkTimer-=dt;if(this.sharkTimer<=0){this.spawnShark();this.sharkTimer=this.sharkSpawnRate;}
+    this.coinTimer-=dt;if(this.coinTimer<=0){this.spawnCoin();this.coinTimer=3+Math.random()*3;}
+    this.puTimer-=dt;if(this.puTimer<=0){this.spawnPowerup();this.puTimer=8+Math.random()*8;}
+    // Repel sharks
+    if(this.repelActive){
+      this.sharks.getChildren().forEach(s=>{
+        const dx=s.x-this.player.x,dy=s.y-this.player.y,dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<120){const f=1;s.body.setVelocity((dx/dist)*180*f,(dy/dist)*180*f);}
+      });
+    } else {
+      // Sharks chase
+      this.sharks.getChildren().forEach(s=>{
+        if(!s.active)return;
+        const dx=this.player.x-s.x,dy=this.player.y-s.y,dist=Math.sqrt(dx*dx+dy*dy)+0.01;
+        const spd=s.speed;
+        s.body.setVelocity((dx/dist)*spd,(dy/dist)*spd);
+        s.rotation=Math.atan2(dy,dx);
+        if(s.x>this.W+60||s.x<-60||s.y>this.H+60||s.y<-60)s.destroy();
+      });
+    }
+    this.updateBackground(dt);
+    this.drawShield();
+    this.drawRepel();
+    this.updateUI();
+    if(this.invincible)this.player.setAlpha(Math.sin(this.gameTime*22)>0?0.3:1);
+    // Score passively
+    this.score+=dt*10*(1+this.depth/100);
+  }
+
+  handleMovement(dt) {
+    const spd=(this.speedBoost?320:180)+(this.depth>100?40:0);
+    let vx=0,vy=0;
+    if(this.usingTouch){
+      const dx=this.tapTarget.x-this.player.x,dy=this.tapTarget.y-this.player.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist>20){vx=(dx/dist)*spd;vy=(dy/dist)*spd;}
+      else{vx=0;vy=0;}
+    } else {
+      if(this.cursors.left.isDown||this.wasd.left.isDown)vx=-spd;
+      else if(this.cursors.right.isDown||this.wasd.right.isDown)vx=spd;
+      if(this.cursors.up.isDown||this.wasd.up.isDown)vy=-spd;
+      else if(this.cursors.down.isDown||this.wasd.down.isDown)vy=spd;
+    }
+    this.player.body.setVelocity(vx,vy);
+    if(vx!==0||vy!==0)this.player.rotation=Math.atan2(vy,vx)+Math.PI/2;
+  }
+
+  spawnShark() {
+    const W=this.W,H=this.H;
+    const side=Phaser.Math.Between(0,3);
+    let x,y;
+    if(side===0){x=Phaser.Math.Between(0,W);y=-40;}
+    else if(side===1){x=W+40;y=Phaser.Math.Between(0,H);}
+    else if(side===2){x=Phaser.Math.Between(0,W);y=H+40;}
+    else{x=-40;y=Phaser.Math.Between(0,H);}
+    const big=this.gameTime>30&&Math.random()<0.2;
+    const s=this.sharks.create(x,y,big?'bshark':'shark').setDepth(8);
+    s.body.setGravityY(0);
+    s.speed=70+this.gameTime*1.5+(big?30:0);
+    s.setTint(big?0xff8866:0xffffff);
+    s.isBig=big;
+  }
+
+  spawnCoin() {
+    const c=this.coinGroup.create(Phaser.Math.Between(40,this.W-40),Phaser.Math.Between(60,this.H-60),'coin').setDepth(7);
+    c.body.setGravityY(0);c.body.setVelocity(0,0);
+    this.tweens.add({targets:c,angle:360,duration:1000,repeat:-1,ease:'Linear'});
+    this.tweens.add({targets:c,alpha:{from:0.7,to:1},yoyo:true,repeat:-1,duration:600});
+  }
+
+  spawnPowerup() {
+    const types=['pu_repel','pu_fins','pu_bubble'];
+    const t=types[Phaser.Math.Between(0,2)];
+    const pu=this.puGroup.create(Phaser.Math.Between(40,this.W-40),Phaser.Math.Between(80,this.H-80),t).setDepth(9);
+    pu.puType=t;pu.body.setGravityY(0);pu.body.setVelocity(0,0);
+    this.tweens.add({targets:pu,scaleX:{from:0.8,to:1.1},scaleY:{from:0.8,to:1.1},yoyo:true,repeat:-1,duration:700});
+  }
+
+  hitShark(player,shark) {
+    if(this.invincible)return;
+    if(this.bubbleActive){shark.destroy();this.splash.setPosition(shark.x,shark.y);this.splash.explode(10);return;}
+    if(this.repelActive){return;}
+    shark.destroy();this.takeDamage();
+  }
+
+  hitCoin(player,coin) {
+    coin.destroy();this.coins++;this.score+=100;
+    this.splash.setPosition(player.x,player.y);this.splash.explode(3);
+  }
+
+  hitPowerup(player,pu) {
+    const type=pu.puType;pu.destroy();
+    const msgs={pu_repel:'🧪 REPELLENT!',pu_fins:'🐠 SPEED FINS!',pu_bubble:'💛 BUBBLE SHIELD!'};
+    if(type==='pu_repel'){this.repelActive=true;this.repelTimer=6;}
+    else if(type==='pu_fins'){this.speedBoost=true;this.speedTimer=7;}
+    else if(type==='pu_bubble'){this.bubbleActive=true;this.bubbleTimer=8;}
+    const ft=this.add.text(this.W/2,this.H*0.45,msgs[type]||'',{fontSize:`${Math.floor(this.W*0.06)}px`,fontFamily:'Arial Black,sans-serif',color:'#00ffcc',stroke:'#003333',strokeThickness:4}).setOrigin(0.5).setDepth(55).setAlpha(0);
+    this.tweens.add({targets:ft,alpha:{from:1,to:0},y:this.H*0.35,duration:1300,ease:'Power2',onComplete:()=>ft.destroy()});
+  }
+
+  takeDamage() {
+    this.lives--;this.invincible=true;this.invincibleTimer=2.5;
+    this.cameras.main.shake(350,0.025);this.cameras.main.flash(200,255,0,0);
+    this.bloodSplat.setPosition(this.player.x,this.player.y);this.bloodSplat.explode(15);
+    if(this.lives<=0)this.endGame();
+    else this.tweens.add({targets:this.player,alpha:0.3,yoyo:true,repeat:8,duration:150});
+  }
+
+  updateBackground(dt) {
+    const W=this.W,H=this.H;
+    this.bgGfx.clear();
+    for(let y=0;y<H;y+=20){
+      const d=y/H,darkness=this.depth/500;
+      const r=Math.floor(0+5*d),gg=Math.floor(20+60*d*(1-darkness*0.5)),b=Math.floor(40+120*d*(1-darkness*0.3));
+      this.bgGfx.fillStyle(Phaser.Display.Color.GetColor(r,gg,b),1);
+      this.bgGfx.fillRect(0,y,W,20);
+    }
+    // Bubbles
+    this.waterGfx.clear();
+    this.bubbles.forEach(bub=>{
+      bub.y-=bub.sp;bub.x+=Math.sin(this.waterT+bub.y*0.02)*0.4;
+      if(bub.y<-10){bub.y=H+10;bub.x=Phaser.Math.Between(0,W);}
+      this.waterGfx.lineStyle(1,0x88ddff,0.25);
+      this.waterGfx.strokeCircle(bub.x,bub.y,bub.r);
+    });
+    // Depth marker
+    this.bgGfx.fillStyle(0x001122,0.5);this.bgGfx.fillRect(0,0,6,H*(this.depth/600));
+  }
+
+  drawShield() {
+    this.shieldGfx.clear();
+    if(this.bubbleActive){
+      const p=0.5+0.5*Math.sin(this.gameTime*6);
+      this.shieldGfx.lineStyle(3,0xffcc00,p);this.shieldGfx.strokeCircle(this.player.x,this.player.y,32);
+      this.shieldGfx.fillStyle(0xffff00,0.08*p);this.shieldGfx.fillCircle(this.player.x,this.player.y,32);
+    }
+  }
+
+  drawRepel() {
+    this.repelGfx.clear();
+    if(this.repelActive){
+      const p=0.3+0.3*Math.sin(this.gameTime*5);
+      this.repelGfx.lineStyle(2,0x00ffaa,p);this.repelGfx.strokeCircle(this.player.x,this.player.y,120);
+      this.repelGfx.lineStyle(1,0x00ffaa,p*0.5);this.repelGfx.strokeCircle(this.player.x,this.player.y,110);
+    }
+  }
+
+  updateUI() {
+    const W=this.W,H=this.H;
+    this.timeTxt.setText(`${Math.floor(this.gameTime)}s`);
+    this.scoreTxt.setText(`🪙${this.coins}  +${Math.floor(this.score)}`);
+    this.heartsTxt.setText('❤️'.repeat(Math.max(0,this.lives)));
+    this.depthTxt.setText(`Depth: ${this.depth}m`);
+    let pu='';
+    if(this.repelActive)pu+=`🧪${Math.ceil(this.repelTimer)}s `;
+    if(this.speedBoost)pu+=`🐠${Math.ceil(this.speedTimer)}s `;
+    if(this.bubbleActive)pu+=`💛${Math.ceil(this.bubbleTimer)}s `;
+    this.puTxt.setText(pu);
+    // Deep = dark tint
+    if(this.depth>200){const d=Math.min((this.depth-200)/300,0.4);this.cameras.main.setTint(Phaser.Display.Color.GetColor(Math.floor(255*(1-d)),Math.floor(255*(1-d*0.5)),255));}
+    else this.cameras.main.clearTint();
+  }
+
+  endGame() {
+    this.gameOver=true;
+    const t=Math.floor(this.gameTime);
+    const hs=parseInt(localStorage.getItem('sa_hs')||'0');
+    if(t>hs)localStorage.setItem('sa_hs',t);
+    this.cameras.main.clearTint();
+    this.time.delayedCall(600,()=>this.scene.start('GameOverScene',{time:t,score:Math.floor(this.score),coins:this.coins,depth:this.depth,hs:Math.max(t,hs)}));
+  }
+}
+
+class GameOverScene extends Phaser.Scene {
+  constructor() { super('GameOverScene'); }
+  create(data) {
+    const W=this.scale.width,H=this.scale.height;
+    this.cameras.main.setBackgroundColor('#001a2e');
+    this.cameras.main.fadeIn(400,0,0,0);
+    const fs=n=>Math.floor(W*n);
+    this.add.text(W/2,H*0.15,'🦈 GOT YA!',{fontSize:`${fs(0.1)}px`,fontFamily:'Arial Black,sans-serif',color:'#ff4444',stroke:'#000',strokeThickness:6}).setOrigin(0.5);
+    this.add.text(W/2,H*0.3,`⏱ ${data.time}s survived`,{fontSize:`${fs(0.06)}px`,fontFamily:'Arial Black,sans-serif',color:'#00d4ff'}).setOrigin(0.5);
+    this.add.text(W/2,H*0.42,`📊 Score: ${data.score}`,{fontSize:`${fs(0.048)}px`,fontFamily:'Arial,sans-serif',color:'#ffd700'}).setOrigin(0.5);
+    this.add.text(W/2,H*0.52,`🌊 Depth: ${data.depth}m  •  🪙 ${data.coins}`,{fontSize:`${fs(0.038)}px`,fontFamily:'Arial,sans-serif',color:'#88aacc'}).setOrigin(0.5);
+    this.add.text(W/2,H*0.62,`🏆 BEST: ${data.hs}s`,{fontSize:`${fs(0.042)}px`,fontFamily:'Arial,sans-serif',color:'#ffdd88'}).setOrigin(0.5);
+    if(data.time>=data.hs&&data.time>0)this.add.text(W/2,H*0.72,'🎉 NEW RECORD! 🎉',{fontSize:`${fs(0.042)}px`,fontFamily:'Arial Black,sans-serif',color:'#00ff88'}).setOrigin(0.5);
+    const btn=this.add.text(W/2,H*0.82,' DIVE AGAIN ',{fontSize:`${fs(0.07)}px`,fontFamily:'Arial Black,sans-serif',color:'#ffffff',backgroundColor:'#ff444433',padding:{x:20,y:12},stroke:'#ff4444',strokeThickness:2}).setOrigin(0.5).setInteractive({useHandCursor:true});
+    btn.on('pointerdown',()=>{this.cameras.main.fade(200,0,0,0);this.time.delayedCall(200,()=>this.scene.start('GameScene'));});
+    this.tweens.add({targets:btn,scaleX:1.05,scaleY:1.05,yoyo:true,repeat:-1,duration:700,ease:'Sine.InOut'});
+    const menu=this.add.text(W/2,H*0.92,'◀ MENU',{fontSize:`${fs(0.035)}px`,fontFamily:'Arial,sans-serif',color:'#445566'}).setOrigin(0.5).setInteractive({useHandCursor:true});
+    menu.on('pointerdown',()=>this.scene.start('MenuScene'));
+  }
+}
+
+new Phaser.Game({
+  type:Phaser.AUTO,width:GW,height:GH,backgroundColor:'#001a2e',
+  physics:{default:'arcade',arcade:{gravity:{y:0},debug:false}},
+  scene:[BootScene,MenuScene,GameScene,GameOverScene],
+  scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},
+  parent:document.body
 });
-
-function update() {
-  if (state !== 'playing') return;
-  frameCount++;
-  waveT += 0.02;
-
-  if (player.teleportCooldown > 0) player.teleportCooldown--;
-
-  // Spawn sharks
-  const spawnRate = Math.max(40, 100 - score * 3);
-  if (frameCount % spawnRate === 0) spawnShark();
-
-  // Move sharks toward player
-  sharks.forEach(s => {
-    const dx = player.x - s.x;
-    const dy = player.y - s.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const speed = 1.2 + score * 0.08;
-    s.vx = (dx / dist) * speed;
-    s.vy = (dy / dist) * speed;
-    s.x += s.vx;
-    s.y += s.vy;
-    s.wobble += 0.15;
-    s.angle = Math.atan2(dy, dx);
-
-    // Score: shark passed player region without hitting
-    if (!s.scored && dist < 5) s.scored = true;
-  });
-
-  // Remove sharks that passed through
-  const prevLen = sharks.length;
-  sharks = sharks.filter(s => {
-    return s.x > -60 && s.x < W() + 60 && s.y > -60 && s.y < H() + 60;
-  });
-
-  // Score = dodged sharks (ones that went off screen)
-  // Actually let's score by time
-  if (frameCount % 60 === 0) score++;
-
-  // Collision detection
-  for (const s of sharks) {
-    const dx = player.x - s.x;
-    const dy = player.y - s.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < player.r + s.r - 6) {
-      if (score > bestScore) { bestScore = score; localStorage.setItem('shark_best', bestScore); }
-      state = 'dead';
-      for (let i = 0; i < 20; i++) {
-        particles.push({ x: player.x, y: player.y, vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8, life: 1, color: '#ff4444' });
-      }
-      return;
-    }
-  }
-
-  // Ripples
-  ripples.forEach(r => { r.r += 2; r.life -= 0.05; });
-  ripples = ripples.filter(r => r.life > 0);
-
-  // Particles
-  particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.life -= 0.04; });
-  particles = particles.filter(p => p.life > 0);
-}
-
-function drawBackground() {
-  const grad = ctx.createRadialGradient(W()/2, H()/2, 0, W()/2, H()/2, W()*0.7);
-  grad.addColorStop(0, '#001a33');
-  grad.addColorStop(1, '#000a15');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W(), H());
-
-  // Water pattern
-  ctx.strokeStyle = '#00d4ff0a';
-  ctx.lineWidth = 1;
-  for (let y = 0; y < H(); y += 20) {
-    ctx.beginPath();
-    for (let x = 0; x <= W(); x += 6) {
-      const wy = y + Math.sin((x + waveT * 20) * 0.04) * 4;
-      x === 0 ? ctx.moveTo(x, wy) : ctx.lineTo(x, wy);
-    }
-    ctx.stroke();
-  }
-}
-
-function drawShark(s) {
-  ctx.save();
-  ctx.translate(s.x, s.y);
-  ctx.rotate(s.angle);
-  const wobbleY = Math.sin(s.wobble) * 2;
-  ctx.translate(0, wobbleY);
-
-  const r = s.r;
-  // Body
-  ctx.fillStyle = '#4488aa';
-  ctx.beginPath();
-  ctx.ellipse(0, 0, r * 1.5, r * 0.6, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Tail
-  ctx.fillStyle = '#336688';
-  ctx.beginPath();
-  ctx.moveTo(-r * 1.3, 0);
-  ctx.lineTo(-r * 2, -r * 0.5);
-  ctx.lineTo(-r * 2, r * 0.5);
-  ctx.closePath();
-  ctx.fill();
-
-  // Fin
-  ctx.fillStyle = '#336688';
-  ctx.beginPath();
-  ctx.moveTo(r * 0.2, -r * 0.5);
-  ctx.lineTo(r * 0.5, -r * 1.1);
-  ctx.lineTo(r * 0.8, -r * 0.5);
-  ctx.closePath();
-  ctx.fill();
-
-  // Eye
-  ctx.fillStyle = '#000000';
-  ctx.beginPath();
-  ctx.arc(r * 0.8, -r * 0.1, r * 0.12, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Mouth
-  ctx.strokeStyle = '#ff4444';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(r * 1.1, 0, r * 0.3, 0.3, Math.PI - 0.3);
-  ctx.stroke();
-
-  ctx.restore();
-}
-
-function drawPlayer() {
-  const px = player.x;
-  const py = player.y;
-  const r = player.r;
-  const pulse = 1 + Math.sin(frameCount * 0.15) * 0.1;
-
-  // Glow
-  ctx.save();
-  ctx.globalAlpha = 0.3;
-  ctx.fillStyle = '#00d4ff';
-  ctx.beginPath();
-  ctx.arc(px, py, r * 2.5 * pulse, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // Core
-  ctx.fillStyle = player.teleportCooldown > 0 ? '#ffd700' : '#00d4ff';
-  ctx.beginPath();
-  ctx.arc(px, py, r * pulse, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Inner dot
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.arc(px, py, r * 0.35, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Person emoji-ish
-  ctx.fillStyle = '#0a0a1a';
-  ctx.font = `${r * 1.1}px sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('🏊', px, py);
-}
-
-function drawRipples() {
-  ripples.forEach(r => {
-    ctx.save();
-    ctx.globalAlpha = r.life * 0.5;
-    ctx.strokeStyle = '#00d4ff';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-  });
-}
-
-function drawParticles() {
-  particles.forEach(p => {
-    ctx.save();
-    ctx.globalAlpha = p.life;
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  });
-}
-
-function drawHUD() {
-  ctx.fillStyle = '#00d4ff';
-  ctx.font = `bold ${W() * 0.06}px 'Segoe UI', sans-serif`;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText(`⏱ ${score}s`, 14, 14);
-  ctx.fillStyle = '#ffd700';
-  ctx.font = `${W() * 0.04}px 'Segoe UI', sans-serif`;
-  ctx.textAlign = 'right';
-  ctx.fillText(`BEST: ${bestScore}s`, W() - 14, 14);
-
-  // Teleport cooldown indicator
-  if (player.teleportCooldown > 0) {
-    ctx.fillStyle = '#ffd70066';
-    ctx.fillRect(W()/2 - 30, H() - 20, 60 * (1 - player.teleportCooldown / 12), 8);
-    ctx.strokeStyle = '#ffd700';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(W()/2 - 30, H() - 20, 60, 8);
-  }
-
-  // Hint
-  ctx.fillStyle = '#ffffff44';
-  ctx.font = `${W() * 0.033}px 'Segoe UI', sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.fillText('TAP to teleport away from sharks', W()/2, H() - 36);
-}
-
-function drawScreen(title, sub) {
-  ctx.fillStyle = 'rgba(0,0,0,0.7)';
-  ctx.fillRect(0, 0, W(), H());
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#00d4ff';
-  ctx.font = `bold ${W() * 0.1}px 'Segoe UI', sans-serif`;
-  ctx.fillText(title, W() / 2, H() * 0.35);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = `${W() * 0.055}px 'Segoe UI', sans-serif`;
-  ctx.fillText(sub, W() / 2, H() * 0.48);
-  ctx.fillStyle = '#ffd700';
-  ctx.font = `${W() * 0.045}px 'Segoe UI', sans-serif`;
-  ctx.fillText(`Best: ${bestScore}s`, W() / 2, H() * 0.58);
-  ctx.fillStyle = '#00d4ff';
-  ctx.fillRect(W() * 0.2, H() * 0.68, W() * 0.6, H() * 0.1);
-  ctx.fillStyle = '#0a0a1a';
-  ctx.font = `bold ${W() * 0.055}px 'Segoe UI', sans-serif`;
-  ctx.fillText('▶  TAP TO PLAY', W() / 2, H() * 0.73);
-}
-
-function loop() {
-  ctx.clearRect(0, 0, W(), H());
-  update();
-  drawBackground();
-  sharks.forEach(drawShark);
-  drawRipples();
-  drawPlayer();
-  drawParticles();
-  if (state === 'playing') drawHUD();
-  if (state === 'start') drawScreen('🦈 SHARK', 'Tap to teleport away!');
-  if (state === 'dead') drawScreen('💀 EATEN!', `Score: ${score}s`);
-  requestAnimationFrame(loop);
-}
-
-loop();
 </script>
 </body>
 </html>

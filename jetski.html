@@ -3,374 +3,417 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>🏄 Jetski Racer</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: #0a0a1a;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    overflow: hidden;
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    touch-action: none;
-    user-select: none;
-  }
-  canvas {
-    display: block;
-    max-width: 100vw;
-    max-height: 100vh;
-    border: 2px solid #00d4ff44;
-    border-radius: 12px;
-  }
-  #back-btn {
-    position: fixed;
-    top: 12px; left: 12px;
-    background: #00d4ff22;
-    border: 1px solid #00d4ff55;
-    color: #00d4ff;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    z-index: 100;
-    text-decoration: none;
-    font-weight: 700;
-  }
-</style>
+<title>🏄 Jetski TURBO RACE</title>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+<style>* { margin:0; padding:0; box-sizing:border-box; } body { background:#000; overflow:hidden; touch-action:none; -webkit-user-select:none; user-select:none; } canvas { display:block; margin:0 auto; }</style>
 </head>
 <body>
-<a href="index.html" id="back-btn">← LOBBY</a>
-<canvas id="c"></canvas>
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
+// JETSKI TURBO RACE — Phaser 3
+// CCGS MDA: Mechanics=lane-switch/jump/turbo | Dynamics=risk/reward speed vs obstacles | Aesthetics=speed rush, mastery
+// Player Fantasy: champion jetski racer tearing through impossible ocean courses
+// Flow State: slow intro → escalating obstacles → TURBO BOOST moments of pure speed ecstasy
 
-// Responsive canvas
-function resize() {
-  const maxW = Math.min(window.innerWidth, 480);
-  const maxH = window.innerHeight - 20;
-  canvas.width = maxW;
-  canvas.height = Math.min(maxH, maxW * 1.6);
-}
-resize();
-window.addEventListener('resize', resize);
+const GW = Math.min(window.innerWidth, 480);
+const GH = window.innerHeight;
 
-const W = () => canvas.width;
-const H = () => canvas.height;
+const LANES = 3;
 
-// Game state
-let state = 'start'; // start | playing | dead
-let score = 0;
-let bestScore = parseInt(localStorage.getItem('jetski_best') || '0');
-let frameCount = 0;
-let speed = 3;
-let obstacles = [];
-let particles = [];
-let waveOffset = 0;
-let jumpVel = 0;
-let player = { x: 0, y: 0, vy: 0, onGround: true };
-
-function resetGame() {
-  score = 0;
-  frameCount = 0;
-  speed = 3;
-  obstacles = [];
-  particles = [];
-  player = {
-    x: W() * 0.2,
-    y: H() * 0.65,
-    vy: 0,
-    onGround: true,
-    bobPhase: 0
-  };
-  state = 'playing';
-}
-
-function getGroundY() {
-  return H() * 0.68;
-}
-
-function jump() {
-  if (state === 'start') { resetGame(); return; }
-  if (state === 'dead') { resetGame(); return; }
-  if (player.onGround) {
-    player.vy = -H() * 0.022;
-    player.onGround = false;
-    // Splash particles
-    for (let i = 0; i < 8; i++) {
-      particles.push({
-        x: player.x,
-        y: getGroundY(),
-        vx: (Math.random() - 0.5) * 4,
-        vy: -(Math.random() * 3 + 1),
-        life: 1,
-        color: '#00d4ff'
-      });
-    }
+class BootScene extends Phaser.Scene {
+  constructor() { super('BootScene'); }
+  create() {
+    const g = this.make.graphics({x:0,y:0,add:false});
+    const W = this.scale.width;
+    // Jetski
+    g.clear();
+    g.fillStyle(0x00d4ff,1); g.fillEllipse(32,24,64,24);
+    g.fillStyle(0xffd700,1); g.fillEllipse(32,18,32,14);
+    g.fillStyle(0x0088aa,1); g.fillRect(8,20,48,8);
+    g.fillStyle(0xff6600,1); g.fillEllipse(32,26,16,10);
+    g.fillStyle(0xffffff,1); g.fillCircle(32,14,5);
+    g.generateTexture('jetski',64,36);
+    // Obstacle: rock
+    g.clear(); g.fillStyle(0x888888,1); g.fillEllipse(24,20,48,40);
+    g.fillStyle(0x666666,1); g.fillEllipse(24,18,36,30); g.fillStyle(0xaaaaaa,1); g.fillEllipse(18,14,18,14);
+    g.generateTexture('rock',48,40);
+    // Obstacle: enemy boat
+    g.clear(); g.fillStyle(0xff4444,1); g.fillEllipse(28,18,56,24);
+    g.fillStyle(0xdd0000,1); g.fillRect(8,10,40,12); g.fillStyle(0xffaaaa,1); g.fillRect(18,4,16,10);
+    g.generateTexture('eboat',56,28);
+    // Obstacle: whirlpool
+    g.clear();
+    for(let r=22;r>4;r-=4){const a=(22-r)*0.3;g.lineStyle(3,0x0066ff,a);g.strokeCircle(22,22,r);}
+    g.fillStyle(0x003399,0.8); g.fillCircle(22,22,8);
+    g.generateTexture('whirl',44,44);
+    // Coin
+    g.clear(); g.fillStyle(0xffd700,1); g.fillCircle(10,10,10); g.fillStyle(0xffaa00,1); g.fillCircle(10,10,7);
+    g.fillStyle(0xffd700,1); g.fillRect(8,5,4,10);
+    g.generateTexture('coin',20,20);
+    // Boost pad
+    g.clear(); g.fillStyle(0xff6600,0.9); g.fillEllipse(20,10,40,20); g.fillStyle(0xffff00,1); g.fillTriangle(20,2,10,18,30,18);
+    g.generateTexture('boostpad',40,20);
+    // Particle
+    g.clear(); g.fillStyle(0xffffff,1); g.fillCircle(3,3,3);
+    g.generateTexture('particle',6,6);
+    // Water
+    g.clear(); g.fillStyle(0x0055aa,0.6); g.fillRect(0,0,W,12);
+    g.generateTexture('wave_strip',W,12);
+    g.destroy();
+    this.scene.start('MenuScene');
   }
 }
 
-// Input
-window.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); jump(); } });
-canvas.addEventListener('pointerdown', e => { e.preventDefault(); jump(); });
-
-function spawnObstacle() {
-  const types = ['rock', 'wave', 'buoy'];
-  const type = types[Math.floor(Math.random() * types.length)];
-  const h = type === 'wave' ? H() * 0.12 : (type === 'rock' ? H() * 0.09 : H() * 0.08);
-  obstacles.push({
-    x: W() + 40,
-    y: getGroundY() - h + 4,
-    w: type === 'wave' ? W() * 0.06 : W() * 0.04,
-    h: h,
-    type,
-    color: type === 'rock' ? '#778899' : (type === 'wave' ? '#00aaff' : '#ff4444')
-  });
-}
-
-function update() {
-  if (state !== 'playing') return;
-
-  frameCount++;
-  score = Math.floor(frameCount / 60);
-  speed = 3 + score * 0.15;
-  waveOffset += speed * 0.5;
-
-  // Player physics
-  const gY = getGroundY();
-  player.vy += H() * 0.0012; // gravity
-  player.y += player.vy;
-  if (player.y >= gY) {
-    player.y = gY;
-    player.vy = 0;
-    player.onGround = true;
-  } else {
-    player.onGround = false;
+class MenuScene extends Phaser.Scene {
+  constructor() { super('MenuScene'); }
+  create() {
+    const W=this.scale.width,H=this.scale.height;
+    this.cameras.main.setBackgroundColor('#001133');
+    const fs=n=>Math.floor(W*n);
+    // Animated water bg
+    this.waterGfx=this.add.graphics();
+    this.waveOffset=0;
+    this.add.text(W/2,H*0.1,'🏄 JETSKI RACE',{fontSize:`${fs(0.085)}px`,fontFamily:'Arial Black,sans-serif',color:'#00d4ff',stroke:'#001133',strokeThickness:5}).setOrigin(0.5);
+    this.add.text(W/2,H*0.22,'TURBO EDITION',{fontSize:`${fs(0.055)}px`,fontFamily:'Arial Black,sans-serif',color:'#ffd700',stroke:'#442200',strokeThickness:4}).setOrigin(0.5);
+    const hs=localStorage.getItem('js_hs')||0;
+    this.add.text(W/2,H*0.33,`🏆 BEST: ${hs}m`,{fontSize:`${fs(0.045)}px`,fontFamily:'Arial,sans-serif',color:'#ffdd88'}).setOrigin(0.5);
+    // Jetski preview
+    this.previewGfx=this.add.graphics();
+    this.previewX=W/2;this.previewT=0;
+    const btn=this.add.text(W/2,H*0.65,' ▶ RACE! ',{fontSize:`${fs(0.075)}px`,fontFamily:'Arial Black,sans-serif',color:'#ffffff',backgroundColor:'#ff660033',padding:{x:24,y:14},stroke:'#ff6600',strokeThickness:2}).setOrigin(0.5).setInteractive({useHandCursor:true});
+    btn.on('pointerdown',()=>{this.cameras.main.flash(200,255,100,0);this.time.delayedCall(200,()=>this.scene.start('GameScene'));});
+    this.tweens.add({targets:btn,scaleX:1.06,scaleY:1.06,yoyo:true,repeat:-1,duration:650,ease:'Sine.InOut'});
+    this.add.text(W/2,H*0.79,'Swipe LEFT/RIGHT to change lanes\nTap RIGHT side = TURBO BOOST 🔥\nLeft/Right arrows = lanes  |  Space = boost',{fontSize:`${fs(0.033)}px`,fontFamily:'Arial,sans-serif',color:'#6688aa',align:'center',lineSpacing:4}).setOrigin(0.5);
+    this.add.text(W/2,H*0.92,'3 LANES  •  COINS → SKINS  •  SURVIVE!',{fontSize:`${fs(0.031)}px`,fontFamily:'Arial,sans-serif',color:'#445566',align:'center'}).setOrigin(0.5);
   }
-  player.bobPhase += 0.1;
-
-  // Spawn obstacles
-  const spawnRate = Math.max(60, 120 - score * 2);
-  if (frameCount % spawnRate === 0) spawnObstacle();
-
-  // Move obstacles
-  obstacles.forEach(o => o.x -= speed);
-  obstacles = obstacles.filter(o => o.x > -60);
-
-  // Particles
-  particles.forEach(p => {
-    p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life -= 0.05;
-  });
-  particles = particles.filter(p => p.life > 0);
-
-  // Collision
-  const px = player.x;
-  const py = player.y;
-  const pr = W() * 0.035;
-  for (const o of obstacles) {
-    if (px + pr > o.x + 4 && px - pr < o.x + o.w - 4 && py > o.y + 4 && py - pr * 1.5 < o.y + o.h) {
-      if (score > bestScore) { bestScore = score; localStorage.setItem('jetski_best', bestScore); }
-      state = 'dead';
-      // Explosion
-      for (let i = 0; i < 20; i++) {
-        particles.push({ x: px, y: py, vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8, life: 1, color: Math.random()>0.5?'#ffd700':'#ff4400' });
+  update(t,dt) {
+    const W=this.scale.width,H=this.scale.height;
+    this.waveOffset+=0.8;
+    this.waterGfx.clear();
+    for(let y=0;y<H;y+=28){
+      const brightness=0.3+0.15*(y/H);
+      this.waterGfx.fillStyle(0x0044aa,brightness);
+      this.waterGfx.fillRect(0,y,W,14);
+      for(let x=0;x<W;x+=60){
+        const wx=x+Math.sin((y+this.waveOffset)*0.05)*8;
+        this.waterGfx.fillStyle(0x0088ff,0.08);
+        this.waterGfx.fillEllipse(wx,y+7,50,6);
       }
-      return;
     }
+    this.previewT+=dt/1000;
+    this.previewGfx.clear();
+    const py=H*0.47+Math.sin(this.previewT*2)*6,px=W/2+Math.sin(this.previewT*0.5)*20;
+    this.previewGfx.fillStyle(0x0088ff,0.3); this.previewGfx.fillEllipse(px,py+20,80,12);
+    this.previewGfx.fillStyle(0x00d4ff,1); this.previewGfx.fillEllipse(px,py,64,24);
+    this.previewGfx.fillStyle(0xffd700,1); this.previewGfx.fillEllipse(px,py-6,32,14);
+    this.previewGfx.fillStyle(0xff6600,1); this.previewGfx.fillEllipse(px,py+2,16,10);
   }
 }
 
-function drawWater() {
-  const gY = getGroundY();
-  // Deep water
-  const grad = ctx.createLinearGradient(0, gY, 0, H());
-  grad.addColorStop(0, '#003366');
-  grad.addColorStop(1, '#001122');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, gY, W(), H() - gY);
+class GameScene extends Phaser.Scene {
+  constructor() { super('GameScene'); }
+  create() {
+    const W=this.scale.width,H=this.scale.height;
+    this.W=W;this.H=H;
+    // State
+    this.distance=0;this.score=0;this.coins=0;this.totalCoins=parseInt(localStorage.getItem('js_coins')||'0');
+    this.speed=200;this.maxSpeed=700;this.baseSpeed=200;
+    this.lane=1;this.targetX=W/2;this.switching=false;
+    this.turboActive=false;this.turboDuration=0;this.turboTimer=0;this.turboCooldown=0;
+    this.jumpActive=false;this.jumpY=0;this.jumpVY=0;
+    this.shieldActive=false;this.shieldTimer=0;
+    this.lives=3;this.invincible=false;this.invincibleTimer=0;
+    this.gameOver=false;this.gameTime=0;
+    this.obstacleTimer=0;this.obstacleInterval=1.4;
+    this.coinTimer=0;this.boostPadTimer=0;
+    this.waveOffset=0;this.diffMult=1;
+    this.skinColors=[0x00d4ff,0xff6600,0xff00ff,0x00ff88];
+    this.currentSkin=parseInt(localStorage.getItem('js_skin')||'0');
 
-  // Wave lines
-  ctx.strokeStyle = '#00d4ff44';
-  ctx.lineWidth = 1.5;
-  for (let row = 0; row < 4; row++) {
-    ctx.beginPath();
-    for (let x = -20; x < W() + 20; x += 8) {
-      const y = gY + row * 12 + Math.sin((x + waveOffset + row * 30) * 0.05) * 3;
-      x === -20 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    }
-    ctx.stroke();
+    this.cameras.main.setBackgroundColor('#001133');
+    // Water background layers
+    this.waterGfx=this.add.graphics().setDepth(0);
+    this.laneGfx=this.add.graphics().setDepth(1);
+    // Groups
+    this.obstacles=this.physics.add.group();
+    this.coinGroup=this.physics.add.group();
+    this.boostPads=this.physics.add.group();
+    // Particles
+    this.splash=this.add.particles(0,0,'particle',{speed:{min:40,max:120},scale:{start:0.6,end:0},alpha:{start:0.9,end:0},lifespan:{min:200,max:400},quantity:1,emitting:false,tint:[0x00aaff,0x0088ff,0xffffff,0x88ddff]}).setDepth(12);
+    this.boostTrail=this.add.particles(0,0,'particle',{speed:{min:60,max:200},scale:{start:0.7,end:0},alpha:{start:0.8,end:0},lifespan:{min:150,max:350},quantity:1,emitting:false,tint:[0xff6600,0xffaa00,0xff3300,0xffff00]}).setDepth(8);
+    // Player
+    this.player=this.physics.add.sprite(W/2,H*0.7,'jetski').setDepth(10).setScale(1.3);
+    this.player.body.setGravityY(0);
+    this.shieldGfx=this.add.graphics().setDepth(11);
+    this.boostFlameGfx=this.add.graphics().setDepth(9);
+    // UI
+    const fs=n=>Math.floor(W*n);
+    this.distTxt=this.add.text(10,10,'0m',{fontSize:`${fs(0.05)}px`,fontFamily:'Arial Black,sans-serif',color:'#00d4ff'}).setDepth(40);
+    this.coinTxt=this.add.text(W/2,10,`🪙${this.coins}`,{fontSize:`${fs(0.045)}px`,fontFamily:'Arial Black,sans-serif',color:'#ffd700'}).setOrigin(0.5,0).setDepth(40);
+    this.heartsTxt=this.add.text(W-10,10,'❤️❤️❤️',{fontSize:`${fs(0.042)}px`}).setOrigin(1,0).setDepth(40);
+    this.speedTxt=this.add.text(10,H-50,`${Math.floor(this.speed)} km/h`,{fontSize:`${fs(0.038)}px`,fontFamily:'Arial,sans-serif',color:'#88ddff'}).setDepth(40);
+    this.turboBtnGfx=this.add.graphics().setDepth(50);
+    this.turboLabel=this.add.text(W*0.82,H*0.88,'BOOST',{fontSize:`${fs(0.04)}px`,fontFamily:'Arial Black,sans-serif',color:'#ff6600'}).setOrigin(0.5).setDepth(51);
+    this.turboStatusTxt=this.add.text(W/2,H*0.45,'',{fontSize:`${fs(0.065)}px`,fontFamily:'Arial Black,sans-serif',color:'#ff6600',stroke:'#fff',strokeThickness:3}).setOrigin(0.5).setDepth(55);
+    // Input
+    this.cursors=this.input.keyboard.createCursorKeys();
+    this.spaceKey=this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.leftKey=this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+    this.rightKey=this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+    // Touch
+    this.swipeStartX=null;this.touchBoostPtr=null;
+    this.input.on('pointerdown',this.onPD,this);
+    this.input.on('pointerup',this.onPU,this);
+    // Overlaps
+    this.physics.add.overlap(this.player,this.obstacles,this.hitObstacle,null,this);
+    this.physics.add.overlap(this.player,this.coinGroup,this.hitCoin,null,this);
+    this.physics.add.overlap(this.player,this.boostPads,this.hitBoostPad,null,this);
   }
-}
 
-function drawSky() {
-  const grad = ctx.createLinearGradient(0, 0, 0, getGroundY());
-  grad.addColorStop(0, '#0a0a1a');
-  grad.addColorStop(1, '#0d2244');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W(), getGroundY());
-
-  // Sun/moon
-  ctx.beginPath();
-  ctx.arc(W() * 0.8, H() * 0.12, W() * 0.06, 0, Math.PI * 2);
-  ctx.fillStyle = '#ffd70033';
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(W() * 0.8, H() * 0.12, W() * 0.04, 0, Math.PI * 2);
-  ctx.fillStyle = '#ffd700aa';
-  ctx.fill();
-}
-
-function drawPlayer() {
-  const bob = player.onGround ? Math.sin(player.bobPhase) * 2 : 0;
-  const px = player.x;
-  const py = player.y + bob;
-  const s = W() * 0.07;
-
-  ctx.save();
-  ctx.translate(px, py);
-
-  // Jetski body
-  ctx.fillStyle = '#00d4ff';
-  ctx.beginPath();
-  ctx.ellipse(0, 0, s, s * 0.35, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Jetski nose
-  ctx.fillStyle = '#0090cc';
-  ctx.beginPath();
-  ctx.moveTo(s * 0.7, -s * 0.1);
-  ctx.lineTo(s * 1.2, 0);
-  ctx.lineTo(s * 0.7, s * 0.1);
-  ctx.closePath();
-  ctx.fill();
-
-  // Rider (stick figure ish)
-  ctx.fillStyle = '#ffd700';
-  ctx.beginPath();
-  ctx.ellipse(s * 0.1, -s * 0.5, s * 0.12, s * 0.12, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#ffd700';
-  ctx.lineWidth = s * 0.1;
-  ctx.beginPath();
-  ctx.moveTo(s * 0.1, -s * 0.35);
-  ctx.lineTo(s * 0.1, -s * 0.05);
-  ctx.stroke();
-
-  // Wake spray
-  if (player.onGround) {
-    ctx.strokeStyle = '#00d4ff66';
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 3; i++) {
-      ctx.beginPath();
-      ctx.moveTo(-s * 0.8, i * 4 - s * 0.1);
-      ctx.lineTo(-s * 1.4, i * 6 - s * 0.3);
-      ctx.stroke();
+  onPD(p) {
+    if(this.gameOver)return;
+    if(p.x>this.W*0.55){this.activateTurbo();}
+    else{this.swipeStartX=p.x;this.swipeStartID=p.id;}
+  }
+  onPU(p) {
+    if(this.swipeStartX!==null&&p.id===this.swipeStartID){
+      const dx=p.x-this.swipeStartX;
+      if(Math.abs(dx)>30){if(dx<0)this.moveLeft();else this.moveRight();}
+      this.swipeStartX=null;
     }
   }
 
-  ctx.restore();
-}
+  moveLeft() { if(this.lane>0){this.lane--;this.targetX=this.getLaneX(this.lane);this.splash.setPosition(this.player.x,this.player.y+10);this.splash.explode(6);} }
+  moveRight() { if(this.lane<LANES-1){this.lane++;this.targetX=this.getLaneX(this.lane);this.splash.setPosition(this.player.x,this.player.y+10);this.splash.explode(6);} }
+  getLaneX(l) { return this.W*(0.22+0.28*l); }
 
-function drawObstacles() {
-  obstacles.forEach(o => {
-    ctx.save();
-    if (o.type === 'rock') {
-      ctx.fillStyle = '#778899';
-      ctx.beginPath();
-      ctx.moveTo(o.x + o.w * 0.5, o.y);
-      ctx.lineTo(o.x + o.w, o.y + o.h);
-      ctx.lineTo(o.x, o.y + o.h);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#aabbcc44';
-      ctx.fillRect(o.x + o.w * 0.2, o.y + o.h * 0.2, o.w * 0.2, o.h * 0.2);
-    } else if (o.type === 'wave') {
-      ctx.strokeStyle = '#00aaff';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      for (let x = 0; x <= o.w; x += 4) {
-        const y = o.y + o.h - Math.sin(x / o.w * Math.PI) * o.h;
-        x === 0 ? ctx.moveTo(o.x + x, y) : ctx.lineTo(o.x + x, y);
+  activateTurbo() {
+    if(this.turboCooldown>0)return;
+    this.turboActive=true; this.turboDuration=3; this.turboTimer=3; this.turboCooldown=8;
+    this.cameras.main.shake(300,0.015);
+    this.showStatus('🔥 TURBO BOOST! 🔥',1.5);
+  }
+
+  showStatus(msg,dur) {
+    this.turboStatusTxt.setText(msg).setAlpha(1);
+    this.tweens.add({targets:this.turboStatusTxt,alpha:0,duration:dur*1000,ease:'Power2'});
+  }
+
+  update(t,delta) {
+    if(this.gameOver)return;
+    const dt=delta/1000;
+    this.gameTime+=dt; this.distance+=this.speed*dt/100;
+    // Difficulty scaling
+    this.diffMult=1+this.gameTime/60;
+    this.speed=Math.min(this.baseSpeed+this.gameTime*3,this.maxSpeed);
+    if(this.turboActive){this.speed=Math.min(this.speed*2.5,this.maxSpeed*1.4);}
+    // Timers
+    if(this.turboCooldown>0)this.turboCooldown-=dt;
+    if(this.turboActive){this.turboTimer-=dt;if(this.turboTimer<=0){this.turboActive=false;this.speed=Math.min(this.speed/2.5,this.maxSpeed);}}
+    if(this.invincibleTimer>0){this.invincibleTimer-=dt;if(this.invincibleTimer<=0){this.invincible=false;this.player.setAlpha(1);}}
+    if(this.shieldTimer>0){this.shieldTimer-=dt;if(this.shieldTimer<=0)this.shieldActive=false;}
+    // Jump
+    if(this.jumpActive){this.jumpVY+=dt*1200;this.jumpY+=this.jumpVY*dt;if(this.jumpY>=0){this.jumpY=0;this.jumpActive=false;this.jumpVY=0;}}
+    // Input
+    if(Phaser.Input.Keyboard.JustDown(this.cursors.left)||Phaser.Input.Keyboard.JustDown(this.leftKey))this.moveLeft();
+    if(Phaser.Input.Keyboard.JustDown(this.cursors.right)||Phaser.Input.Keyboard.JustDown(this.rightKey))this.moveRight();
+    if(Phaser.Input.Keyboard.JustDown(this.spaceKey))this.activateTurbo();
+    // Smooth lane transition
+    this.player.x=Phaser.Math.Linear(this.player.x,this.targetX,0.18);
+    this.player.y=(this.H*0.7)+this.jumpY;
+    this.player.scaleX=Phaser.Math.Linear(this.player.scaleX,this.turboActive?1.6:1.3,0.1);
+    this.player.scaleY=Phaser.Math.Linear(this.player.scaleY,this.jumpActive?0.9:1.3,0.1);
+    // Spawn obstacles
+    this.obstacleTimer-=dt;
+    if(this.obstacleTimer<=0){this.spawnObstacle();this.obstacleTimer=Math.max(0.5,this.obstacleInterval-this.gameTime*0.01);}
+    this.coinTimer-=dt;
+    if(this.coinTimer<=0){this.spawnCoin();this.coinTimer=0.8;}
+    this.boostPadTimer-=dt;
+    if(this.boostPadTimer<=0){this.spawnBoostPad();this.boostPadTimer=5+Math.random()*5;}
+    // Move objects downward
+    const scrollSpeed=this.speed*0.9;
+    [...this.obstacles.getChildren(),...this.coinGroup.getChildren(),...this.boostPads.getChildren()].forEach(o=>{
+      o.y+=scrollSpeed*dt;
+      if(o.y>this.H+60)o.destroy();
+    });
+    this.updateWater(dt);
+    this.drawLanes();
+    this.drawBoostBtn();
+    this.drawShield();
+    this.drawBoostFlame();
+    this.updateUI();
+    // Particles
+    if(this.turboActive){this.boostTrail.setPosition(this.player.x,this.player.y+18);this.boostTrail.explode(4);}
+    if(this.invincible)this.player.setAlpha(Math.sin(this.gameTime*22)>0?0.3:1);
+  }
+
+  spawnObstacle() {
+    const types=['rock','eboat','whirl'],weights=[0.5,0.3,0.2];
+    const r=Math.random(); let type='rock';
+    if(r>0.5&&this.gameTime>10)type='eboat'; else if(r>0.8&&this.gameTime>20)type='whirl';
+    const lane=Phaser.Math.Between(0,LANES-1);
+    const o=this.obstacles.create(this.getLaneX(lane),-40,type).setDepth(8);
+    o.body.setGravityY(0); o.body.setVelocity(0,0);
+    o.setBodySize(type==='rock'?38:type==='eboat'?46:36,type==='rock'?34:type==='eboat'?22:38);
+  }
+
+  spawnCoin() {
+    const lane=Phaser.Math.Between(0,LANES-1);
+    const c=this.coinGroup.create(this.getLaneX(lane),-20,'coin').setDepth(9);
+    c.body.setGravityY(0); this.tweens.add({targets:c,angle:360,duration:800,repeat:-1,ease:'Linear'});
+  }
+
+  spawnBoostPad() {
+    const lane=Phaser.Math.Between(0,LANES-1);
+    const b=this.boostPads.create(this.getLaneX(lane),-20,'boostpad').setDepth(9).setScale(1.5);
+    b.body.setGravityY(0);
+    this.tweens.add({targets:b,alpha:{from:0.7,to:1},yoyo:true,repeat:-1,duration:400});
+  }
+
+  hitObstacle(player,obs) {
+    if(this.invincible||this.jumpActive)return;
+    if(this.shieldActive){this.shieldActive=false;obs.destroy();this.cameras.main.shake(200,0.01);return;}
+    obs.destroy(); this.takeDamage();
+  }
+
+  hitCoin(player,coin) {
+    coin.destroy(); this.coins++; this.score+=50*(this.turboActive?3:1);
+    this.splash.setPosition(player.x,player.y); this.splash.explode(4);
+  }
+
+  hitBoostPad(player,pad) {
+    pad.destroy(); this.activateTurbo();
+    this.showStatus('⚡ SPEED PAD!',1.2);
+  }
+
+  takeDamage() {
+    this.lives--; this.invincible=true; this.invincibleTimer=2.5;
+    this.cameras.main.shake(350,0.025);
+    this.splash.setPosition(this.player.x,this.player.y); this.splash.explode(15);
+    if(this.lives<=0)this.endGame();
+  }
+
+  updateWater(dt) {
+    const W=this.W,H=this.H; this.waveOffset+=this.speed*dt*0.3;
+    this.waterGfx.clear();
+    for(let y=0;y<H;y+=20){
+      const d=y/H;
+      this.waterGfx.fillStyle(Phaser.Display.Color.GetColor(0,Math.floor(40+80*d),Math.floor(100+100*d)),1);
+      this.waterGfx.fillRect(0,y,W,20);
+      if(y%40===0){
+        for(let x=0;x<W;x+=50){
+          const wx=((x+this.waveOffset*0.3)%W);
+          this.waterGfx.fillStyle(0x0088ff,0.07+0.04*d);
+          this.waterGfx.fillEllipse(wx,y+10,45,6);
+        }
       }
-      ctx.stroke();
-      ctx.fillStyle = '#00aaff33';
-      ctx.fill();
-    } else {
-      // buoy
-      ctx.fillStyle = '#ff4444';
-      ctx.beginPath();
-      ctx.arc(o.x + o.w * 0.5, o.y + o.h * 0.5, o.w * 0.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(o.x + o.w * 0.5, o.y + o.h * 0.5, o.w * 0.25, 0, Math.PI * 2);
-      ctx.fill();
     }
-    ctx.restore();
-  });
+  }
+
+  drawLanes() {
+    const W=this.W,H=this.H; this.laneGfx.clear();
+    for(let i=1;i<LANES;i++){
+      const x=W*(0.36*i-0.14+0.22);
+      for(let y=0;y<H;y+=40){
+        this.laneGfx.fillStyle(0xffffff,0.08);
+        this.laneGfx.fillRect(x-1,(y+this.waveOffset*0.5)%H,2,20);
+      }
+    }
+  }
+
+  drawBoostBtn() {
+    const W=this.W,H=this.H;
+    this.turboBtnGfx.clear();
+    const cd=this.turboCooldown,ready=cd<=0;
+    const col=ready?0xff6600:0x554433;
+    const a=ready?0.35:0.15;
+    this.turboBtnGfx.fillStyle(col,a); this.turboBtnGfx.fillCircle(W*0.82,H*0.88,44);
+    this.turboBtnGfx.lineStyle(2,ready?0xff6600:0x554433,ready?0.8:0.3);
+    this.turboBtnGfx.strokeCircle(W*0.82,H*0.88,44);
+    if(!ready){
+      const f=1-cd/8;
+      this.turboBtnGfx.lineStyle(3,0xff6600,0.7);
+      this.turboBtnGfx.beginPath(); this.turboBtnGfx.arc(W*0.82,H*0.88,44,-Math.PI/2,-Math.PI/2+Math.PI*2*f,false);
+      this.turboBtnGfx.strokePath();
+    }
+    this.turboLabel.setColor(ready?'#ff6600':'#554433');
+    if(this.turboActive){
+      this.turboBtnGfx.fillStyle(0xff6600,0.5+0.3*Math.sin(this.gameTime*10));
+      this.turboBtnGfx.fillCircle(W*0.82,H*0.88,44);
+    }
+  }
+
+  drawShield() {
+    this.shieldGfx.clear();
+    if(this.shieldActive){
+      const p=0.5+0.5*Math.sin(this.gameTime*7);
+      this.shieldGfx.lineStyle(3,0x00ffff,p); this.shieldGfx.strokeEllipse(this.player.x,this.player.y,70,38);
+    }
+  }
+
+  drawBoostFlame() {
+    this.boostFlameGfx.clear();
+    if(this.turboActive){
+      const p=0.6+0.4*Math.sin(this.gameTime*20);
+      for(let i=0;i<3;i++){
+        const ox=(i-1)*14,fl=20+12*p;
+        this.boostFlameGfx.fillStyle(i===1?0xff6600:0xff3300,0.7+0.2*p);
+        this.boostFlameGfx.fillTriangle(this.player.x+ox-5,this.player.y+16,this.player.x+ox+5,this.player.y+16,this.player.x+ox,this.player.y+16+fl);
+      }
+    }
+  }
+
+  updateUI() {
+    const W=this.W,H=this.H;
+    const dist=Math.floor(this.distance);
+    this.distTxt.setText(`${dist}m`);
+    this.coinTxt.setText(`🪙 ${this.coins}`);
+    this.heartsTxt.setText('❤️'.repeat(Math.max(0,this.lives)));
+    this.speedTxt.setText(`${Math.floor(this.speed)} km/h`);
+    if(this.turboActive){
+      const p=0.5+0.5*Math.sin(this.gameTime*8);
+      this.cameras.main.setTint(Phaser.Display.Color.GetColor(255,Math.floor(160+40*p),0));
+    } else { this.cameras.main.clearTint(); }
+  }
+
+  endGame() {
+    this.gameOver=true;
+    const dist=Math.floor(this.distance);
+    const hs=parseInt(localStorage.getItem('js_hs')||'0');
+    if(dist>hs)localStorage.setItem('js_hs',dist);
+    const tc=this.totalCoins+this.coins;
+    localStorage.setItem('js_coins',tc);
+    this.cameras.main.clearTint();
+    this.time.delayedCall(600,()=>this.scene.start('GameOverScene',{score:this.score,dist,coins:this.coins,hs:Math.max(dist,hs)}));
+  }
 }
 
-function drawParticles() {
-  particles.forEach(p => {
-    ctx.save();
-    ctx.globalAlpha = p.life;
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  });
+class GameOverScene extends Phaser.Scene {
+  constructor() { super('GameOverScene'); }
+  create(data) {
+    const W=this.scale.width,H=this.scale.height;
+    this.cameras.main.setBackgroundColor('#001133');
+    this.cameras.main.fadeIn(400,0,0,0);
+    const fs=n=>Math.floor(W*n);
+    this.add.text(W/2,H*0.15,'WIPEOUT!',{fontSize:`${fs(0.12)}px`,fontFamily:'Arial Black,sans-serif',color:'#00d4ff',stroke:'#000',strokeThickness:6}).setOrigin(0.5);
+    this.add.text(W/2,H*0.3,`📏 ${data.dist}m`,{fontSize:`${fs(0.07)}px`,fontFamily:'Arial Black,sans-serif',color:'#ffd700'}).setOrigin(0.5);
+    this.add.text(W/2,H*0.42,`🪙 ${data.coins} COINS`,{fontSize:`${fs(0.05)}px`,fontFamily:'Arial,sans-serif',color:'#ffd700'}).setOrigin(0.5);
+    this.add.text(W/2,H*0.52,`🏆 BEST: ${data.hs}m`,{fontSize:`${fs(0.045)}px`,fontFamily:'Arial,sans-serif',color:'#ffdd88'}).setOrigin(0.5);
+    if(data.dist>=data.hs&&data.dist>0)this.add.text(W/2,H*0.62,'🎉 NEW RECORD! 🎉',{fontSize:`${fs(0.045)}px`,fontFamily:'Arial Black,sans-serif',color:'#00ff88'}).setOrigin(0.5);
+    const btn=this.add.text(W/2,H*0.75,' RACE AGAIN ',{fontSize:`${fs(0.07)}px`,fontFamily:'Arial Black,sans-serif',color:'#ffffff',backgroundColor:'#ff660033',padding:{x:20,y:12},stroke:'#ff6600',strokeThickness:2}).setOrigin(0.5).setInteractive({useHandCursor:true});
+    btn.on('pointerdown',()=>{this.cameras.main.fade(200,0,0,0);this.time.delayedCall(200,()=>this.scene.start('GameScene'));});
+    this.tweens.add({targets:btn,scaleX:1.05,scaleY:1.05,yoyo:true,repeat:-1,duration:700,ease:'Sine.InOut'});
+    const menu=this.add.text(W/2,H*0.88,'◀ MENU',{fontSize:`${fs(0.035)}px`,fontFamily:'Arial,sans-serif',color:'#445566'}).setOrigin(0.5).setInteractive({useHandCursor:true});
+    menu.on('pointerdown',()=>this.scene.start('MenuScene'));
+  }
 }
 
-function drawHUD() {
-  ctx.fillStyle = '#00d4ff';
-  ctx.font = `bold ${W() * 0.055}px 'Segoe UI', sans-serif`;
-  ctx.textAlign = 'left';
-  ctx.fillText(`⏱ ${score}s`, 14, 36);
-  ctx.fillStyle = '#ffd700';
-  ctx.font = `${W() * 0.038}px 'Segoe UI', sans-serif`;
-  ctx.textAlign = 'right';
-  ctx.fillText(`BEST: ${bestScore}s`, W() - 14, 36);
-}
-
-function drawScreen(title, sub) {
-  ctx.fillStyle = 'rgba(0,0,0,0.65)';
-  ctx.fillRect(0, 0, W(), H());
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#00d4ff';
-  ctx.font = `bold ${W() * 0.09}px 'Segoe UI', sans-serif`;
-  ctx.fillText(title, W() / 2, H() * 0.4);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = `${W() * 0.05}px 'Segoe UI', sans-serif`;
-  ctx.fillText(sub, W() / 2, H() * 0.52);
-  ctx.fillStyle = '#ffd700';
-  ctx.font = `${W() * 0.04}px 'Segoe UI', sans-serif`;
-  ctx.fillText(`Best: ${bestScore}s`, W() / 2, H() * 0.62);
-  ctx.fillStyle = '#00d4ff';
-  ctx.fillRect(W() * 0.2, H() * 0.7, W() * 0.6, H() * 0.09);
-  ctx.fillStyle = '#0a0a1a';
-  ctx.font = `bold ${W() * 0.05}px 'Segoe UI', sans-serif`;
-  ctx.fillText('▶  TAP TO PLAY', W() / 2, H() * 0.77);
-}
-
-function loop() {
-  ctx.clearRect(0, 0, W(), H());
-  update();
-  drawSky();
-  drawWater();
-  drawObstacles();
-  drawPlayer();
-  drawParticles();
-  if (state === 'playing') drawHUD();
-  if (state === 'start') drawScreen('🏄 JETSKI', 'Tap / Space to jump');
-  if (state === 'dead') drawScreen('💥 WIPEOUT!', `Score: ${score}s`);
-  requestAnimationFrame(loop);
-}
-
-loop();
+new Phaser.Game({
+  type:Phaser.AUTO, width:GW, height:GH, backgroundColor:'#001133',
+  physics:{default:'arcade',arcade:{gravity:{y:0},debug:false}},
+  scene:[BootScene,MenuScene,GameScene,GameOverScene],
+  scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},
+  parent:document.body
+});
 </script>
 </body>
 </html>
