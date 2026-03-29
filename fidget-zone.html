@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🫧 Alberto's Fidget Zone</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+:root {
+  --lavender: #c9b8f5;
+  --mint: #a8e6cf;
+  --peach: #ffd3b6;
+  --sky: #a8d8ea;
+  --gold: #fde68a;
+  --soft-white: #f8f6ff;
+}
+
+html, body {
+  width:100%; height:100%; overflow:hidden;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #e8e0ff;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+/* ── Toy panels ── */
+.toy-panel {
+  position: absolute;
+  inset: 0;
+  bottom: 72px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+  overflow: hidden;
+}
+.toy-panel.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* ── Nav bar ── */
+#nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 72px;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  border-top: 2px solid rgba(180,160,220,0.3);
+  z-index: 100;
+}
+.nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 26px;
+  padding: 8px 0;
+  border-radius: 16px 16px 0 0;
+  transition: background 0.2s, transform 0.15s;
+}
+.nav-btn span.label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #999;
+  letter-spacing: 0.5px;
+}
+.nav-btn.active {
+  background: rgba(180,160,240,0.2);
+}
+.nav-btn.active span.label { color: #7c5cbf; }
+.nav-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: 32px;
+  height: 3px;
+  background: linear-gradient(90deg, #b89aff, #7c5cbf);
+  border-radius: 3px 3px 0 0;
+}
+.nav-btn { position: relative; }
+
+/* ── Flash overlay ── */
+#flash {
+  position: fixed;
+  inset: 0;
+  background: rgba(255,230,100,0.8);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56px;
+  font-weight: 900;
+  color: #5a3a00;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+/* ═══════════════════════════════════════
+   1. BUBBLE WRAP
+═══════════════════════════════════════ */
+#panel-bubbles {
+  background: linear-gradient(160deg, #dce8ff 0%, #e8d8ff 50%, #ffe8f0 100%);
+}
+#bubble-grid {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+}
+.bubble {
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+}
+.bubble:not(.popped):hover { transform: scale(1.12); }
+.bubble.popped {
+  opacity: 0;
+  transform: scale(0.05);
+}
+.bubble::before {
+  content: '';
+  position: absolute;
+  top: 18%;
+  left: 22%;
+  width: 28%;
+  height: 22%;
+  background: rgba(255,255,255,0.65);
+  border-radius: 50%;
+  transform: rotate(-30deg);
+}
+
+/* ═══════════════════════════════════════
+   2. CALM SLIME
+═══════════════════════════════════════ */
+#panel-slime {
+  background: linear-gradient(160deg, #d0ffe8 0%, #d8e8ff 60%, #e8d8ff 100%);
+}
+#slime-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: none;
+}
+#slime-hint {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,0.6);
+  border-radius: 50px;
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #6a4a9a;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}
+
+/* ═══════════════════════════════════════
+   3. SAND ART
+═══════════════════════════════════════ */
+#panel-sand {
+  background: linear-gradient(160deg, #fff8e8 0%, #ffe8d0 60%, #fff0e8 100%);
+}
+#sand-canvas {
+  position: absolute;
+  inset: 0;
+  top: 0;
+  width: 100%;
+  height: calc(100% - 60px);
+  cursor: crosshair;
+  touch-action: none;
+}
+#sand-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0; right: 0;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 12px;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(8px);
+}
+.color-dot {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: transform 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.color-dot.selected { border-color: #7c5cbf; transform: scale(1.25); }
+.sand-btn {
+  padding: 8px 16px;
+  border-radius: 50px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  background: rgba(180,160,240,0.35);
+  color: #5a3a8a;
+  transition: background 0.15s, transform 0.1s;
+}
+.sand-btn:active { transform: scale(0.93); background: rgba(180,160,240,0.6); }
+
+/* ═══════════════════════════════════════
+   4. BREATHING BUBBLE
+═══════════════════════════════════════ */
+#panel-breath {
+  background: linear-gradient(160deg, #d8f8f0 0%, #fef9d8 60%, #f0d8ff 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+#breath-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+#breath-ui {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+#breath-label {
+  font-size: 36px;
+  font-weight: 900;
+  color: #3a7a6a;
+  text-shadow: 0 2px 8px rgba(0,120,100,0.2);
+  transition: color 1s;
+  text-align: center;
+}
+#breath-counter {
+  font-size: 18px;
+  font-weight: 700;
+  color: #8a6a4a;
+  background: rgba(255,255,255,0.6);
+  border-radius: 50px;
+  padding: 6px 20px;
+  backdrop-filter: blur(8px);
+}
+#breath-restart {
+  display: none;
+  padding: 14px 36px;
+  border-radius: 50px;
+  border: none;
+  background: linear-gradient(135deg, #a8e6cf, #7fd3bc);
+  color: #2a5a4a;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(100,200,160,0.4);
+  animation: pulse-btn 1.5s ease-in-out infinite;
+}
+@keyframes pulse-btn {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+/* ═══════════════════════════════════════
+   5. SPIN FIDGET
+═══════════════════════════════════════ */
+#panel-spin {
+  background: linear-gradient(160deg, #f0e8ff 0%, #e8f0ff 50%, #ffe8f8 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+#spin-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  touch-action: none;
+}
+#speed-label {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 22px;
+  font-weight: 900;
+  padding: 8px 24px;
+  border-radius: 50px;
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(8px);
+  color: #5a3a8a;
+  z-index: 2;
+  transition: color 0.3s;
+  white-space: nowrap;
+}
+#skin-bar {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 2;
+  background: rgba(255,255,255,0.55);
+  border-radius: 50px;
+  padding: 6px 16px;
+  backdrop-filter: blur(8px);
+}
+.skin-btn {
+  font-size: 22px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  padding: 4px;
+  border-radius: 8px;
+  transition: transform 0.15s;
+  opacity: 0.6;
+}
+.skin-btn.active { opacity: 1; transform: scale(1.25); }
+
+/* ── Back button ── */
+#back-btn {
+  position: fixed;
+  top: 12px; left: 12px;
+  z-index: 9999;
+}
+</style>
+</head>
+<body>
+
+<a href="index.html" id="back-btn" style="background:rgba(255,255,255,0.3);color:#555;border:2px solid #aaa;border-radius:50px;padding:8px 16px;font-size:16px;font-weight:800;text-decoration:none;font-family:system-ui,sans-serif;backdrop-filter:blur(10px);">🏠 Arcade</a>
+
+<div id="flash">POPPED! 🎉</div>
+
+<!-- ══ PANEL 1: BUBBLE WRAP ══ -->
+<div class="toy-panel active" id="panel-bubbles">
+  <div id="bubble-grid"></div>
+</div>
+
+<!-- ══ PANEL 2: CALM SLIME ══ -->
+<div class="toy-panel" id="panel-slime">
+  <canvas id="slime-canvas"></canvas>
+  <div id="slime-hint">👆 Touch and drag the slime!</div>
+</div>
+
+<!-- ══ PANEL 3: SAND ART ══ -->
+<div class="toy-panel" id="panel-sand">
+  <canvas id="sand-canvas"></canvas>
+  <div id="sand-controls">
+    <div class="color-dot selected" data-color="#d4a853" style="background:#d4a853"></div>
+    <div class="color-dot" data-color="#6ab4f5" style="background:#6ab4f5"></div>
+    <div class="color-dot" data-color="#c47ee8" style="background:#c47ee8"></div>
+    <div class="color-dot" data-color="#6dd6a0" style="background:#6dd6a0"></div>
+    <div class="color-dot" data-color="#f5a26a" style="background:#f5a26a"></div>
+    <div class="color-dot" data-color="#e8e0ff" style="background:#e8e0ff"></div>
+    <button class="sand-btn" id="tilt-btn">🌊 Tilt</button>
+    <button class="sand-btn" id="clear-btn">✨ Clear</button>
+  </div>
+</div>
+
+<!-- ══ PANEL 4: BREATHING ══ -->
+<div class="toy-panel" id="panel-breath">
+  <canvas id="breath-canvas"></canvas>
+  <div id="breath-ui">
+    <div id="breath-label">Breathe In... 😊</div>
+    <div id="breath-counter">Breath 1 of 5</div>
+    <button id="breath-restart" onclick="resetBreath()">🌟 Again!</button>
+  </div>
+</div>
+
+<!-- ══ PANEL 5: SPINNER ══ -->
+<div class="toy-panel" id="panel-spin">
+  <canvas id="spin-canvas"></canvas>
+  <div id="speed-label">SLOW</div>
+  <div id="skin-bar">
+    <button class="skin-btn active" data-skin="classic" title="Classic">⚫</button>
+    <button class="skin-btn" data-skin="rainbow" title="Rainbow">🌈</button>
+    <button class="skin-btn" data-skin="galaxy" title="Galaxy">🌌</button>
+    <button class="skin-btn" data-skin="flame" title="Flame">🔥</button>
+  </div>
+</div>
+
+<!-- ══ NAV ══ -->
+<nav id="nav">
+  <button class="nav-btn active" data-panel="bubbles">
+    🫧<span class="label">BUBBLES</span>
+  </button>
+  <button class="nav-btn" data-panel="slime">
+    🌊<span class="label">SLIME</span>
+  </button>
+  <button class="nav-btn" data-panel="sand">
+    🎨<span class="label">SAND</span>
+  </button>
+  <button class="nav-btn" data-panel="breath">
+    😮‍💨<span class="label">BREATHE</span>
+  </button>
+  <button class="nav-btn" data-panel="spin">
+    🌀<span class="label">SPIN</span>
+  </button>
+</nav>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════
+// AUDIO ENGINE
+// ═══════════════════════════════════
+let audioCtx = null;
+function getAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playPop() {
+  try {
+    const ac = getAudio();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    const freq = 600 + Math.random() * 600;
+    osc.frequency.setValueAtTime(freq, ac.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.3, ac.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.18, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.09);
+    osc.start(ac.currentTime);
+    osc.stop(ac.currentTime + 0.1);
+  } catch(e){}
+}
+
+function playSlimeSound(stretch) {
+  try {
+    const ac = getAudio();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type = 'sine';
+    const baseFreq = 80 + stretch * 120;
+    osc.frequency.setValueAtTime(baseFreq, ac.currentTime);
+    gain.gain.setValueAtTime(0.05, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.08);
+    osc.start(ac.currentTime);
+    osc.stop(ac.currentTime + 0.08);
+  } catch(e){}
+}
+
+function playSandSound() {
+  try {
+    const ac = getAudio();
+    const bufSize = ac.sampleRate * 0.05;
+    const buf = ac.createBuffer(1, bufSize, ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * 0.06;
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    const gain = ac.createGain();
+    src.connect(gain); gain.connect(ac.destination);
+    gain.gain.setValueAtTime(0.12, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.05);
+    src.start(ac.currentTime);
+  } catch(e){}
+}
+
+function playBell(vol=0.2) {
+  try {
+    const ac = getAudio();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ac.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(440, ac.currentTime + 0.6);
+    gain.gain.setValueAtTime(vol, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.6);
+    osc.start(ac.currentTime);
+    osc.stop(ac.currentTime + 0.65);
+  } catch(e){}
+}
+
+function playSpinSound(speed) {
+  try {
+    if (speed < 0.5) return;
+    const ac = getAudio();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type = 'sawtooth';
+    const freq = 30 + speed * 60;
+    osc.frequency.setValueAtTime(freq, ac.currentTime);
+    gain.gain.setValueAtTime(0.04, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.06);
+    osc.start(ac.currentTime);
+    osc.stop(ac.currentTime + 0.06);
+  } catch(e){}
+}
+
+// ═══════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════
+const panels = {};
+const navBtns = {};
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  const p = btn.dataset.panel;
+  navBtns[p] = btn;
+  panels[p] = document.getElementById('panel-' + p);
+});
+
+let currentPanel = 'bubbles';
+
+function switchPanel(name) {
+  if (name === currentPanel) return;
+  panels[currentPanel].classList.remove('active');
+  navBtns[currentPanel].classList.remove('active');
+  currentPanel = name;
+  panels[name].classList.add('active');
+  navBtns[name].classList.add('active');
+  if (name === 'sand') resizeSandCanvas();
+  if (name === 'slime') initSlime();
+  if (name === 'breath') startBreath();
+  if (name === 'spin') resizeSpinCanvas();
+}
+
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchPanel(btn.dataset.panel));
+});
+
+// ═══════════════════════════════════
+// 1. BUBBLE WRAP
+// ═══════════════════════════════════
+const BUBBLE_COLORS = [
+  '#ffb3c6','#ffd6a5','#fdffb6','#caffbf','#9bf6ff','#a0c4ff','#bdb2ff','#ffc6ff'
+];
+const grid = document.getElementById('bubble-grid');
+const flashEl = document.getElementById('flash');
+let totalBubbles = 0;
+let poppedCount = 0;
+
+function makeBubbles() {
+  grid.innerHTML = '';
+  const W = window.innerWidth;
+  const H = window.innerHeight - 72;
+  const area = W * H;
+  const avgR = 28;
+  const count = Math.min(Math.floor(area / (avgR * avgR * 5)), 80);
+  totalBubbles = count;
+  poppedCount = 0;
+
+  for (let i = 0; i < count; i++) {
+    const b = document.createElement('div');
+    b.className = 'bubble';
+    const r = 20 + Math.random() * 24;
+    b.style.width = b.style.height = r * 2 + 'px';
+    const col = BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)];
+    b.style.background = `radial-gradient(circle at 35% 35%, ${col}, ${col}aa)`;
+    b.style.boxShadow = `0 4px 12px ${col}88, inset 0 -3px 6px rgba(0,0,0,0.08)`;
+    b.addEventListener('pointerdown', () => popBubble(b));
+    grid.appendChild(b);
+  }
+}
+
+function popBubble(el) {
+  if (el.classList.contains('popped')) return;
+  el.classList.add('popped');
+  playPop();
+  spawnParticles(el);
+  poppedCount++;
+  if (poppedCount >= totalBubbles) {
+    setTimeout(showPoppedFlash, 300);
+  }
+}
+
+function showPoppedFlash() {
+  flashEl.style.opacity = '1';
+  setTimeout(() => {
+    flashEl.style.opacity = '0';
+    setTimeout(makeBubbles, 400);
+  }, 900);
+}
+
+function spawnParticles(el) {
+  const rect = el.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  for (let i = 0; i < 8; i++) {
+    const p = document.createElement('div');
+    p.style.cssText = `
+      position:fixed;left:${cx}px;top:${cy}px;
+      width:7px;height:7px;border-radius:50%;
+      background:${BUBBLE_COLORS[Math.floor(Math.random()*BUBBLE_COLORS.length)]};
+      pointer-events:none;z-index:500;
+      transform:translate(-50%,-50%);
+      transition:all 0.4s ease-out;
+    `;
+    document.body.appendChild(p);
+    const angle = (i / 8) * Math.PI * 2;
+    const dist = 30 + Math.random() * 50;
+    setTimeout(() => {
+      p.style.transform = `translate(calc(-50% + ${Math.cos(angle)*dist}px), calc(-50% + ${Math.sin(angle)*dist}px)) scale(0)`;
+      p.style.opacity = '0';
+    }, 10);
+    setTimeout(() => p.remove(), 450);
+  }
+}
+
+makeBubbles();
+window.addEventListener('resize', makeBubbles);
+
+// ═══════════════════════════════════
+// 2. CALM SLIME
+// ═══════════════════════════════════
+const slimeCanvas = document.getElementById('slime-canvas');
+const slimeCtx = slimeCanvas.getContext('2d');
+let slimeW, slimeH;
+let slimePoints = [];
+let slimeCX, slimeCY, slimeR;
+let slimeDragging = false;
+let slimeDragX = 0, slimeDragY = 0;
+let slimeVelX = 0, slimeVelY = 0;
+let slimeStretch = 0;
+let slimeParticles = [];
+let slimeInitialized = false;
+
+const NUM_SLIME_POINTS = 36;
+const SPRING_K = 0.12;
+const DAMPING = 0.75;
+
+function initSlime() {
+  if (slimeInitialized) return;
+  slimeInitialized = true;
+  resizeSlime();
+  window.addEventListener('resize', resizeSlime);
+  slimeCanvas.addEventListener('pointerdown', slimeDown);
+  slimeCanvas.addEventListener('pointermove', slimeMove);
+  slimeCanvas.addEventListener('pointerup', slimeUp);
+  slimeCanvas.addEventListener('pointerleave', slimeUp);
+  animateSlime();
+}
+
+function resizeSlime() {
+  slimeCanvas.width = slimeW = slimeCanvas.offsetWidth;
+  slimeCanvas.height = slimeH = slimeCanvas.offsetHeight;
+  slimeCX = slimeW / 2;
+  slimeCY = slimeH / 2;
+  slimeR = Math.min(slimeW, slimeH) * 0.28;
+  buildSlimePoints();
+}
+
+function buildSlimePoints() {
+  slimePoints = [];
+  for (let i = 0; i < NUM_SLIME_POINTS; i++) {
+    const a = (i / NUM_SLIME_POINTS) * Math.PI * 2;
+    slimePoints.push({
+      angle: a,
+      r: slimeR,
+      vr: 0,
+      targetR: slimeR
+    });
+  }
+}
+
+function slimeDown(e) {
+  slimeDragging = true;
+  slimeDragX = e.clientX;
+  slimeDragY = e.clientY;
+  slimeCanvas.setPointerCapture(e.pointerId);
+}
+
+function slimeMove(e) {
+  if (!slimeDragging) return;
+  const nx = e.clientX, ny = e.clientY;
+  slimeVelX = nx - slimeDragX;
+  slimeVelY = ny - slimeDragY;
+  slimeDragX = nx;
+  slimeDragY = ny;
+
+  // Deform points near drag
+  const dx = nx - slimeCX, dy = ny - slimeCY;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const dragAngle = Math.atan2(dy, dx);
+  slimeStretch = Math.min(dist / slimeR, 2.5);
+
+  for (const pt of slimePoints) {
+    const angleDiff = Math.abs(((pt.angle - dragAngle + Math.PI * 3) % (Math.PI*2)) - Math.PI);
+    const influence = Math.max(0, 1 - angleDiff / (Math.PI * 0.6));
+    const stretchAmt = influence * Math.min(dist * 0.55, slimeR * 1.1);
+    pt.targetR = slimeR + stretchAmt;
+  }
+
+  if (slimeStretch > 1.5 && Math.random() < 0.3) {
+    spawnSlimeParticle(nx, ny);
+  }
+  playSlimeSound(slimeStretch);
+}
+
+function slimeUp() {
+  slimeDragging = false;
+  slimeStretch = 0;
+  slimeVelX = 0; slimeVelY = 0;
+  for (const pt of slimePoints) pt.targetR = slimeR;
+}
+
+function spawnSlimeParticle(x, y) {
+  slimeParticles.push({
+    x, y,
+    vx: (Math.random() - 0.5) * 4,
+    vy: 2 + Math.random() * 3,
+    r: 4 + Math.random() * 6,
+    life: 1.0,
+    color: lerpSlimeColor(slimeStretch)
+  });
+}
+
+function lerpSlimeColor(t) {
+  // blue→purple→pink
+  const tt = Math.min(t / 2.5, 1);
+  if (tt < 0.5) {
+    const s = tt * 2;
+    const r = Math.round(120 + 80*s), g = Math.round(180 - 60*s), b = Math.round(240 - 20*s);
+    return `rgb(${r},${g},${b})`;
+  } else {
+    const s = (tt - 0.5) * 2;
+    const r = Math.round(200 + 30*s), g = Math.round(120 - 40*s), b = Math.round(220 - 40*s);
+    return `rgb(${r},${g},${b})`;
+  }
+}
+
+function animateSlime() {
+  requestAnimationFrame(animateSlime);
+  const W = slimeW, H = slimeH;
+  slimeCtx.clearRect(0, 0, W, H);
+
+  // Spring physics for each point
+  for (const pt of slimePoints) {
+    const force = (pt.targetR - pt.r) * SPRING_K;
+    pt.vr = pt.vr * DAMPING + force;
+    pt.r += pt.vr;
+  }
+
+  // Wobble on velocity
+  if (!slimeDragging && (Math.abs(slimeVelX) > 0.1 || Math.abs(slimeVelY) > 0.1)) {
+    slimeVelX *= 0.9;
+    slimeVelY *= 0.9;
+  }
+
+  // Draw slime blob
+  const stretch = slimeStretch;
+  const col1 = lerpSlimeColor(stretch);
+  const col2 = lerpSlimeColor(stretch * 0.5);
+
+  slimeCtx.beginPath();
+  for (let i = 0; i < NUM_SLIME_POINTS; i++) {
+    const pt = slimePoints[i];
+    const x = slimeCX + Math.cos(pt.angle) * pt.r;
+    const y = slimeCY + Math.sin(pt.angle) * pt.r;
+    if (i === 0) slimeCtx.moveTo(x, y);
+    else {
+      const prev = slimePoints[(i - 1 + NUM_SLIME_POINTS) % NUM_SLIME_POINTS];
+      const px = slimeCX + Math.cos(prev.angle) * prev.r;
+      const py = slimeCY + Math.sin(prev.angle) * prev.r;
+      const mx = (px + x) / 2, my = (py + y) / 2;
+      slimeCtx.quadraticCurveTo(px, py, mx, my);
+    }
+  }
+  slimeCtx.closePath();
+
+  const grad = slimeCtx.createRadialGradient(slimeCX - slimeR*0.2, slimeCY - slimeR*0.2, slimeR*0.1, slimeCX, slimeCY, slimeR*1.4);
+  grad.addColorStop(0, col2 + 'ee');
+  grad.addColorStop(0.7, col1 + 'cc');
+  grad.addColorStop(1, col1 + '66');
+  slimeCtx.fillStyle = grad;
+  slimeCtx.shadowColor = col1;
+  slimeCtx.shadowBlur = 30;
+  slimeCtx.fill();
+  slimeCtx.shadowBlur = 0;
+
+  // Shine
+  slimeCtx.beginPath();
+  slimeCtx.ellipse(slimeCX - slimeR*0.28, slimeCY - slimeR*0.28, slimeR*0.22, slimeR*0.12, -Math.PI/4, 0, Math.PI*2);
+  slimeCtx.fillStyle = 'rgba(255,255,255,0.35)';
+  slimeCtx.fill();
+
+  // Particles
+  slimeParticles = slimeParticles.filter(p => p.life > 0.05);
+  for (const p of slimeParticles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.2;
+    p.life *= 0.92;
+    slimeCtx.beginPath();
+    slimeCtx.arc(p.x, p.y, p.r * p.life, 0, Math.PI*2);
+    slimeCtx.fillStyle = p.color + Math.round(p.life * 255).toString(16).padStart(2,'0');
+    slimeCtx.fill();
+  }
+}
+
+// ═══════════════════════════════════
+// 3. SAND ART
+// ═══════════════════════════════════
+const sandCanvas = document.getElementById('sand-canvas');
+const sandCtx = sandCanvas.getContext('2d');
+const SAND_COLS = 200;
+let SAND_ROWS = 300;
+let sandGrid = null;
+let sandColorGrid = null;
+let sandCurrentColor = '#d4a853';
+let sandDrawing = false;
+let sandLastX = -1, sandLastY = -1;
+let sandSoundTimer = 0;
+let sandAnimFrame = null;
+
+const EMPTY = 0, SAND_CELL = 1;
+
+function resizeSandCanvas() {
+  const rect = sandCanvas.getBoundingClientRect();
+  sandCanvas.width = rect.width;
+  sandCanvas.height = rect.height;
+  SAND_ROWS = Math.floor(rect.height / (rect.width / SAND_COLS));
+  initSandGrid();
+}
+
+function initSandGrid() {
+  sandGrid = new Uint8Array(SAND_COLS * SAND_ROWS);
+  sandColorGrid = new Array(SAND_COLS * SAND_ROWS).fill('#d4a853');
+}
+
+function sandIdx(x, y) { return y * SAND_COLS + x; }
+
+function addSand(gx, gy, col) {
+  if (gx < 0 || gx >= SAND_COLS || gy < 0 || gy >= SAND_ROWS) return;
+  for (let dy = -2; dy <= 2; dy++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      const nx = gx + dx, ny = gy + dy;
+      if (nx < 0 || nx >= SAND_COLS || ny < 0 || ny >= SAND_ROWS) continue;
+      if (sandGrid[sandIdx(nx, ny)] === EMPTY && Math.random() < 0.7) {
+        sandGrid[sandIdx(nx, ny)] = SAND_CELL;
+        sandColorGrid[sandIdx(nx, ny)] = col;
+      }
+    }
+  }
+}
+
+function updateSand() {
+  // Process from bottom to top
+  for (let y = SAND_ROWS - 2; y >= 0; y--) {
+    for (let x = 0; x < SAND_COLS; x++) {
+      const idx = sandIdx(x, y);
+      if (sandGrid[idx] !== SAND_CELL) continue;
+      const below = sandIdx(x, y+1);
+      if (sandGrid[below] === EMPTY) {
+        sandGrid[below] = SAND_CELL;
+        sandColorGrid[below] = sandColorGrid[idx];
+        sandGrid[idx] = EMPTY;
+      } else {
+        const dir = Math.random() < 0.5 ? -1 : 1;
+        const bl = sandIdx(x + dir, y+1);
+        const br = sandIdx(x - dir, y+1);
+        if (x + dir >= 0 && x + dir < SAND_COLS && sandGrid[bl] === EMPTY) {
+          sandGrid[bl] = SAND_CELL;
+          sandColorGrid[bl] = sandColorGrid[idx];
+          sandGrid[idx] = EMPTY;
+        } else if (x - dir >= 0 && x - dir < SAND_COLS && sandGrid[br] === EMPTY) {
+          sandGrid[br] = SAND_CELL;
+          sandColorGrid[br] = sandColorGrid[idx];
+          sandGrid[idx] = EMPTY;
+        }
+      }
+    }
+  }
+}
+
+function drawSand() {
+  const cw = sandCanvas.width, ch = sandCanvas.height;
+  const cellW = cw / SAND_COLS;
+  const cellH = ch / SAND_ROWS;
+
+  // Background gradient
+  const bg = sandCtx.createLinearGradient(0, 0, 0, ch);
+  bg.addColorStop(0, '#fff8e8');
+  bg.addColorStop(1, '#ffe8d0');
+  sandCtx.fillStyle = bg;
+  sandCtx.fillRect(0, 0, cw, ch);
+
+  for (let i = 0; i < sandGrid.length; i++) {
+    if (sandGrid[i] === SAND_CELL) {
+      const x = (i % SAND_COLS) * cellW;
+      const y = Math.floor(i / SAND_COLS) * cellH;
+      sandCtx.fillStyle = sandColorGrid[i];
+      sandCtx.fillRect(x, y, cellW + 0.5, cellH + 0.5);
+    }
+  }
+}
+
+function sandLoop() {
+  updateSand();
+  drawSand();
+  sandAnimFrame = requestAnimationFrame(sandLoop);
+}
+
+function screenToSandGrid(clientX, clientY) {
+  const rect = sandCanvas.getBoundingClientRect();
+  const px = (clientX - rect.left) / rect.width;
+  const py = (clientY - rect.top) / rect.height;
+  return {
+    gx: Math.floor(px * SAND_COLS),
+    gy: Math.floor(py * SAND_ROWS)
+  };
+}
+
+sandCanvas.addEventListener('pointerdown', e => {
+  sandDrawing = true;
+  sandCanvas.setPointerCapture(e.pointerId);
+  const {gx, gy} = screenToSandGrid(e.clientX, e.clientY);
+  addSand(gx, gy, sandCurrentColor);
+  sandLastX = gx; sandLastY = gy;
+});
+sandCanvas.addEventListener('pointermove', e => {
+  if (!sandDrawing) return;
+  const {gx, gy} = screenToSandGrid(e.clientX, e.clientY);
+  addSand(gx, gy, sandCurrentColor);
+  sandLastX = gx; sandLastY = gy;
+  sandSoundTimer++;
+  if (sandSoundTimer % 4 === 0) playSandSound();
+});
+sandCanvas.addEventListener('pointerup', () => { sandDrawing = false; });
+sandCanvas.addEventListener('pointerleave', () => { sandDrawing = false; });
+
+document.querySelectorAll('.color-dot').forEach(dot => {
+  dot.addEventListener('click', () => {
+    document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
+    dot.classList.add('selected');
+    sandCurrentColor = dot.dataset.color;
+  });
+});
+
+document.getElementById('clear-btn').addEventListener('click', () => {
+  initSandGrid();
+  playBell(0.15);
+});
+
+document.getElementById('tilt-btn').addEventListener('click', () => {
+  // Shake: redistribute sand randomly downward
+  const shuffled = new Uint8Array(SAND_COLS * SAND_ROWS);
+  const shuffledColor = new Array(SAND_COLS * SAND_ROWS).fill('#d4a853');
+  const particles = [];
+  for (let i = 0; i < sandGrid.length; i++) {
+    if (sandGrid[i] === SAND_CELL) {
+      particles.push({ col: sandColorGrid[i] });
+    }
+  }
+  // Randomly drop them
+  for (const p of particles) {
+    const x = Math.floor(Math.random() * SAND_COLS);
+    const y = Math.floor(Math.random() * SAND_ROWS * 0.5); // upper half
+    const idx = sandIdx(x, y);
+    shuffled[idx] = SAND_CELL;
+    shuffledColor[idx] = p.col;
+  }
+  sandGrid = shuffled;
+  sandColorGrid = shuffledColor;
+  playBell(0.12);
+});
+
+// Initialize sand when panel first shows
+let sandInited = false;
+function ensureSandInit() {
+  if (!sandInited) {
+    sandInited = true;
+    resizeSandCanvas();
+    sandLoop();
+  }
+}
+
+// ═══════════════════════════════════
+// 4. BREATHING BUBBLE
+// ═══════════════════════════════════
+const breathCanvas = document.getElementById('breath-canvas');
+const breathCtx = breathCanvas.getContext('2d');
+const breathLabel = document.getElementById('breath-label');
+const breathCounter = document.getElementById('breath-counter');
+const breathRestart = document.getElementById('breath-restart');
+
+const BREATH_PHASES = [
+  { name: 'Breathe In... 😊', dur: 4000, expand: true,  color: '#5dd6c0', textColor: '#2a6a5a' },
+  { name: 'Hold... 🌟',       dur: 2000, expand: null,   color: '#f6d860', textColor: '#7a5a1a' },
+  { name: 'Breathe Out... 😌',dur: 6000, expand: false,  color: '#c4a8f0', textColor: '#5a3a8a' },
+];
+const MAX_BREATHS = 5;
+
+let breathPhase = 0;
+let breathBreath = 1;
+let breathPhaseStart = 0;
+let breathRunning = false;
+let breathAnimFrame = null;
+let breathMinR, breathMaxR;
+let breathParticles = [];
+let breathInited = false;
+
+function startBreath() {
+  if (breathInited) return;
+  breathInited = true;
+  resizeBreath();
+  window.addEventListener('resize', resizeBreath);
+  breathRun();
+  animateBreath();
+}
+
+function resizeBreath() {
+  breathCanvas.width = breathCanvas.offsetWidth;
+  breathCanvas.height = breathCanvas.offsetHeight;
+  const side = Math.min(breathCanvas.width, breathCanvas.height);
+  breathMinR = side * 0.18;
+  breathMaxR = side * 0.38;
+}
+
+function resetBreath() {
+  breathPhase = 0;
+  breathBreath = 1;
+  breathRunning = false;
+  breathParticles = [];
+  breathRestart.style.display = 'none';
+  breathLabel.textContent = 'Breathe In... 😊';
+  breathLabel.style.color = '#3a7a6a';
+  breathCounter.textContent = `Breath 1 of ${MAX_BREATHS}`;
+  breathRun();
+}
+
+function breathRun() {
+  breathPhaseStart = performance.now();
+  breathRunning = true;
+  updateBreathUI();
+}
+
+function updateBreathUI() {
+  const ph = BREATH_PHASES[breathPhase];
+  breathLabel.textContent = ph.name;
+  breathLabel.style.color = ph.textColor;
+  breathCounter.textContent = `Breath ${breathBreath} of ${MAX_BREATHS}`;
+  playBell(0.15);
+}
+
+function animateBreath() {
+  requestAnimationFrame(animateBreath);
+  const W = breathCanvas.width, H = breathCanvas.height;
+  const cx = W / 2, cy = H / 2;
+  breathCtx.clearRect(0, 0, W, H);
+
+  const now = performance.now();
+  const elapsed = now - breathPhaseStart;
+  const ph = BREATH_PHASES[breathPhase];
+
+  // Compute orb radius
+  let t = Math.min(elapsed / ph.dur, 1);
+  let eased = t < 0.5 ? 2*t*t : -1+(4-2*t)*t; // easeInOut
+  let orbR;
+  if (ph.expand === true) {
+    orbR = breathMinR + (breathMaxR - breathMinR) * eased;
+  } else if (ph.expand === false) {
+    orbR = breathMaxR - (breathMaxR - breathMinR) * eased;
+  } else {
+    orbR = breathMaxR; // hold
+  }
+
+  // Particle aura
+  if (Math.random() < 0.4) {
+    const angle = Math.random() * Math.PI * 2;
+    const r = orbR + 10;
+    breathParticles.push({
+      x: cx + Math.cos(angle) * r,
+      y: cy + Math.sin(angle) * r,
+      vx: Math.cos(angle) * (0.5 + Math.random()),
+      vy: Math.sin(angle) * (0.5 + Math.random()),
+      life: 1.0,
+      col: ph.color
+    });
+  }
+
+  // Draw particles
+  breathParticles = breathParticles.filter(p => p.life > 0.05);
+  for (const p of breathParticles) {
+    p.x += p.vx; p.y += p.vy; p.life *= 0.96;
+    breathCtx.beginPath();
+    breathCtx.arc(p.x, p.y, 4 * p.life, 0, Math.PI*2);
+    breathCtx.fillStyle = p.col + Math.round(p.life*180).toString(16).padStart(2,'0');
+    breathCtx.fill();
+  }
+
+  // Outer glow rings
+  for (let i = 3; i >= 1; i--) {
+    const gr = orbR + i * 18;
+    breathCtx.beginPath();
+    breathCtx.arc(cx, cy, gr, 0, Math.PI*2);
+    breathCtx.strokeStyle = ph.color + Math.round(60 / i).toString(16).padStart(2,'0');
+    breathCtx.lineWidth = 6;
+    breathCtx.stroke();
+  }
+
+  // Main orb
+  const grad = breathCtx.createRadialGradient(cx - orbR*0.25, cy - orbR*0.25, orbR*0.05, cx, cy, orbR);
+  grad.addColorStop(0, ph.color + 'ff');
+  grad.addColorStop(0.6, ph.color + 'cc');
+  grad.addColorStop(1, ph.color + '44');
+  breathCtx.beginPath();
+  breathCtx.arc(cx, cy, orbR, 0, Math.PI*2);
+  breathCtx.shadowColor = ph.color;
+  breathCtx.shadowBlur = orbR * 0.6;
+  breathCtx.fillStyle = grad;
+  breathCtx.fill();
+  breathCtx.shadowBlur = 0;
+
+  // Shine
+  breathCtx.beginPath();
+  breathCtx.ellipse(cx - orbR*0.25, cy - orbR*0.25, orbR*0.2, orbR*0.12, -Math.PI/4, 0, Math.PI*2);
+  breathCtx.fillStyle = 'rgba(255,255,255,0.4)';
+  breathCtx.fill();
+
+  // Phase transition
+  if (breathRunning && elapsed >= ph.dur) {
+    breathPhase = (breathPhase + 1) % 3;
+    if (breathPhase === 0) {
+      breathBreath++;
+      if (breathBreath > MAX_BREATHS) {
+        breathRunning = false;
+        breathLabel.textContent = 'Great job! 🌟 You\'re calm.';
+        breathLabel.style.color = '#5a3a8a';
+        breathCounter.textContent = '5 breaths done! ✨';
+        breathRestart.style.display = 'block';
+        return;
+      }
+    }
+    breathPhaseStart = now;
+    updateBreathUI();
+  }
+}
+
+// ═══════════════════════════════════
+// 5. SPIN FIDGET
+// ═══════════════════════════════════
+const spinCanvas = document.getElementById('spin-canvas');
+const spinCtx = spinCanvas.getContext('2d');
+const speedLabel = document.getElementById('speed-label');
+let spinW, spinH, spinCX, spinCY, spinRadius;
+let spinAngle = 0;
+let spinVelocity = 0;
+const SPIN_FRICTION = 0.991;
+const ARM_COUNT = 3;
+let spinSkin = 'classic';
+let spinLastTouch = null;
+let spinLastTouchTime = 0;
+let spinInited = false;
+let spinSoundTimer = 0;
+
+function resizeSpinCanvas() {
+  spinCanvas.width = spinW = spinCanvas.offsetWidth;
+  spinCanvas.height = spinH = spinCanvas.offsetHeight;
+  spinCX = spinW / 2;
+  spinCY = spinH / 2;
+  spinRadius = Math.min(spinW, spinH) * 0.35;
+  if (!spinInited) {
+    spinInited = true;
+    spinCanvas.addEventListener('pointerdown', spinPointerDown);
+    spinCanvas.addEventListener('pointermove', spinPointerMove);
+    spinCanvas.addEventListener('pointerup', spinPointerUp);
+    spinCanvas.addEventListener('pointercancel', spinPointerUp);
+    document.querySelectorAll('.skin-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.skin-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        spinSkin = btn.dataset.skin;
+      });
+    });
+    animateSpin();
+  }
+}
+
+function spinPointerDown(e) {
+  spinLastTouch = { x: e.clientX, y: e.clientY, t: performance.now() };
+  spinCanvas.setPointerCapture(e.pointerId);
+}
+
+function spinPointerMove(e) {
+  if (!spinLastTouch) return;
+  const now = performance.now();
+  const dt = now - spinLastTouch.t;
+  if (dt < 5) return;
+  const ox = spinLastTouch.x - spinCX, oy = spinLastTouch.y - spinCY;
+  const nx = e.clientX - spinCX, ny = e.clientY - spinCY;
+  const cross = ox * ny - oy * nx;
+  const len = Math.sqrt(nx*nx + ny*ny);
+  if (len > 10) {
+    const dAngle = cross / (len * len);
+    spinVelocity += dAngle * 12;
+  }
+  spinLastTouch = { x: e.clientX, y: e.clientY, t: now };
+}
+
+function spinPointerUp() { spinLastTouch = null; }
+
+function getSpeedLabel(v) {
+  const av = Math.abs(v);
+  if (av < 0.01) return 'STILL';
+  if (av < 0.05) return 'SLOW';
+  if (av < 0.15) return 'FAST ⚡';
+  return 'TURBO 🔥';
+}
+
+function getSpinSkinColors(skin, glowT) {
+  switch(skin) {
+    case 'rainbow': {
+      return (i) => `hsl(${(i * 120 + glowT * 60) % 360}, 85%, 65%)`;
+    }
+    case 'galaxy': {
+      return (i) => {
+        const hues = [240, 270, 300];
+        return `hsl(${hues[i % hues.length]}, 70%, ${50 + glowT * 15}%)`;
+      };
+    }
+    case 'flame': {
+      return (i) => {
+        const hues = [20, 35, 10];
+        return `hsl(${hues[i % hues.length]}, 100%, ${50 + glowT * 20}%)`;
+      };
+    }
+    default: // classic
+      return (i) => {
+        const cols = ['#a0c4ff', '#bdb2ff', '#ffc6ff'];
+        return cols[i % cols.length];
+      };
+  }
+}
+
+function animateSpin() {
+  requestAnimationFrame(animateSpin);
+  spinVelocity *= SPIN_FRICTION;
+  spinAngle += spinVelocity;
+
+  const W = spinW, H = spinH;
+  spinCtx.clearRect(0, 0, W, H);
+
+  const spd = Math.abs(spinVelocity);
+  const glowT = Math.min(spd / 0.15, 1);
+  const colorFn = getSpinSkinColors(spinSkin, glowT);
+
+  // Draw arms
+  for (let i = 0; i < ARM_COUNT; i++) {
+    const armAngle = spinAngle + (i / ARM_COUNT) * Math.PI * 2;
+    const ax = spinCX + Math.cos(armAngle) * spinRadius;
+    const ay = spinCY + Math.sin(armAngle) * spinRadius;
+
+    const col = colorFn(i);
+
+    // Glow effect
+    if (glowT > 0.05) {
+      spinCtx.shadowColor = col;
+      spinCtx.shadowBlur = 20 + glowT * 40;
+    }
+
+    // Arm body
+    spinCtx.beginPath();
+    spinCtx.moveTo(spinCX, spinCY);
+    spinCtx.lineTo(ax, ay);
+    spinCtx.strokeStyle = col;
+    spinCtx.lineWidth = 14 + glowT * 8;
+    spinCtx.lineCap = 'round';
+    spinCtx.stroke();
+
+    // Tip circle
+    spinCtx.beginPath();
+    spinCtx.arc(ax, ay, 22 + glowT * 10, 0, Math.PI*2);
+    const tipGrad = spinCtx.createRadialGradient(ax, ay, 2, ax, ay, 22 + glowT*10);
+    tipGrad.addColorStop(0, 'white');
+    tipGrad.addColorStop(0.4, col);
+    tipGrad.addColorStop(1, col + '88');
+    spinCtx.fillStyle = tipGrad;
+    spinCtx.fill();
+  }
+
+  spinCtx.shadowBlur = 0;
+
+  // Center cap
+  const capGrad = spinCtx.createRadialGradient(spinCX, spinCY, 2, spinCX, spinCY, 24);
+  capGrad.addColorStop(0, '#ffffff');
+  capGrad.addColorStop(0.5, '#ddccff');
+  capGrad.addColorStop(1, '#9966dd');
+  spinCtx.beginPath();
+  spinCtx.arc(spinCX, spinCY, 24, 0, Math.PI*2);
+  spinCtx.fillStyle = capGrad;
+  spinCtx.shadowColor = '#9966dd';
+  spinCtx.shadowBlur = 15;
+  spinCtx.fill();
+  spinCtx.shadowBlur = 0;
+
+  // Speed label
+  const label = getSpeedLabel(spinVelocity);
+  speedLabel.textContent = label;
+  if (spd > 0.15) speedLabel.style.color = '#d44';
+  else if (spd > 0.05) speedLabel.style.color = '#a44cc8';
+  else speedLabel.style.color = '#5a3a8a';
+
+  // Sound
+  spinSoundTimer++;
+  if (spinSoundTimer % 3 === 0) playSpinSound(spd * 15);
+}
+
+// ═══════════════════════════════════
+// NAV: wire up panel inits
+// ═══════════════════════════════════
+const origSwitch = switchPanel;
+
+// Override to init lazily
+(function() {
+  // Already active: init sand if switching to sand
+  document.querySelector('[data-panel="sand"]').addEventListener('click', () => {
+    setTimeout(ensureSandInit, 50);
+  });
+  document.querySelector('[data-panel="spin"]').addEventListener('click', () => {
+    setTimeout(resizeSpinCanvas, 50);
+  });
+})();
+
+// Init spin canvas on load
+window.addEventListener('load', () => {
+  resizeSpinCanvas();
+  window.addEventListener('resize', () => {
+    if (currentPanel === 'spin') resizeSpinCanvas();
+    if (currentPanel === 'sand') resizeSandCanvas();
+    if (currentPanel === 'slime') resizeSlime();
+    if (currentPanel === 'breath') resizeBreath();
+  });
+});
+</script>
+</body>
+</html>
